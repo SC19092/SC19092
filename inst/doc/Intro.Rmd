@@ -145,9 +145,9 @@ It is impossible to explain this method but we can see how to use the function. 
 {\mathbf{x}_{\left(a_{d}+1: n\right)}} & {\mathbf{x}_{\left(a_{d}+1: n\right)}} & {\cdots} & {\mathbf{x}_{\left(a_{d}+1: n\right)}}
 \end{array}\right)\left(\begin{array}{c}
 {\boldsymbol{\beta}_{0}} \\
-{\boldsymbol{\beta}_{0}} \\
+{\boldsymbol{\zeta}_{1}} \\
 {\vdots} \\
-{\boldsymbol{\beta}_{0}}
+{\boldsymbol{\zeta}_{d}}
 \end{array}\right)+\epsilon
 \end{equation}
 
