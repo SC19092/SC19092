@@ -1,0 +1,1573 @@
+---
+title: "Introduction to SC19092"
+author: '19092'
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to SC19092}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Overview
+
+__SC19092__ is my first R package containing three functions implementing three useful methods I learnt during this semester, including examples. To be concrete, the first function is designed for my undergraduate thesis. It considers the problem of change point detection with FDR control. The second function concerns nonparametric test of independence between two random variables. The third function is used to perform efficient sampling from standard laplace distribution based on R package _Rcpp_. The solutions to all homework are also attached here for future purpose.
+
+# Part 1. Introduction to the main functions
+
+## 1 cplm
+
+The first function _cplm_ is designed for change point detection in linear model, that is, the point when the regression coefficients start to change. This method converts the problem into a variable selection problem and apply the idea of knockoff filter so that it can detect change points with both high power and guaranteed FDR control. The argument X is the design matrix and Y is the response vector. The argument target sets the desired FDR one wants to obtain. The argument c is the tuning parameter determining the length of intervals and is typically set to 1 or 2 from a Bayesian perspective. The argument changepoint is the oracle location of the change points. Since this function is used for simulation purpose, the oracle location is provided as contrast. It returns the FDR, modified FDR and power of two knockoff thresholds.
+
+The source R code for function _cplm_ is as follows:
+
+```{r,eval=FALSE}
+function(X, Y, target, c, changepoint){
+  #Generate Data
+  n <- nrow(X)
+  p <- ncol(X)
+  c <- 1
+  m <- ceiling(c*sqrt(n))
+  q <- floor(n/m)
+  # Generate Large design matrix
+  K_temp <- matrix(0, nrow = q, ncol=q, byrow=TRUE)
+  X_temp <- X
+  Y_temp <- c(Y)
+  for(i in 1:q)
+    K_temp[i,1:i] <- rep(1,i)
+  x <- NULL
+  y <- NULL
+  x[[1]] <- as.matrix(X_temp[1:((n-(q-1)*m)),])
+  y[[1]] <- Y_temp[1:((n-(q-1)*m))]
+  for(i in 2:q){
+    x[[i]] <- as.matrix(X_temp[(n-(q-i+1)*m+1):((n-(q-i)*m)),])
+    y[[i]] <- Y_temp[(n-(q-i+1)*m+1):((n-(q-i)*m))]
+  }
+  X_temp1 <- lapply(1:length(x), function(j, mat, list) kronecker(K_temp[j,,drop=FALSE], x[[j]]), mat=K_temp, list=x) 
+  Xn <- do.call("rbind",X_temp1)
+  # First step pilot estimator
+  cv1 <- cv.glmnet(Xn,Y_temp)
+  nonzero1 <- predict(cv1,s="lambda.1se",type="nonzero")[,1]
+  cv1 <- cv.glmnet(Xn[,nonzero1],Y_temp)
+  betanot0 <- as.vector(predict(cv1,s="lambda.min",type="coefficients"))[-1]
+  w1 <- rep(0,ncol(Xn))
+  w1[nonzero1] <- betanot0
+  sub.w <- w1[-c(((q-1)*p+1):(q*p))]
+  sub.X <- Xn[-c(1:((n-(q-1)*m))),-c(1:p)]
+  sub.y <- Y_temp[-c(1:((n-(q-1)*m)))]
+  Z <- sub.y-sub.X%*%sub.w
+  K2_temp <- matrix(0, nrow = q-1, ncol=q-1, byrow=TRUE)
+  for(i in 1:(q-1))
+    K2_temp[i,i] <- 1
+  x2 <- NULL
+  for(i in 2:q){
+    x2[[i-1]] <- as.matrix(X_temp[(n-(q-i+1)*m+1):((n-(q-i)*m)),])
+  }
+  X2_temp1 <-lapply(1:length(x2), function(j, mat, list) kronecker(K2_temp[j,,drop=FALSE], x2[[j]]), mat=K2_temp, list=x2) 
+  Xn2 <- do.call("rbind",X2_temp1)
+  # construct contrast and regression
+  x2ko <- NULL
+  for (i in 1:(q-2)) {
+    x2ko[[i]] <- x2[[i+1]]
+  }
+  x2ko[[(q-1)]] <- x2[[1]]
+  X2ko_temp1 <-lapply(1:length(x2ko), function(j, mat, list) kronecker(K2_temp[j,,drop=FALSE], x2ko[[j]]), mat=K2_temp, list=x2ko) 
+  Xn2ko <- do.call("rbind",X2ko_temp1)
+  XXX <- cbind(Xn2,Xn2ko) # Augumented design
+  cv2 <- cv.glmnet(XXX , Z)
+  beta3 <- as.vector(predict(cv2,s="lambda.min",type="coefficients"))[-1]
+  # Compute W-Statistics
+  fifth_matrix <- matrix(beta3,p,length(beta3)/p)
+  q1 <- dim(fifth_matrix)[2]/2
+  W <- NULL
+  for (i in 1:q1) {
+    W[i] <- sum(abs(fifth_matrix[,i]))-sum(abs(fifth_matrix[,i+q1]))}
+  # Set the Threshold
+  t <- MFKnockoffs::MFKnockoffs.threshold(W,q=target,method = "knockoff")
+  t_plus <- MFKnockoffs::MFKnockoffs.threshold(W,q=target,method = "knockoff+")
+  S_plus <- which(W>=t_plus)
+  S_plus <- S_plus+1
+  S <- which(W>=t)
+  S <- S+1
+  # The segments of true changepoints
+  tc <- NULL
+  l1 <- m+n%%m
+  tr <- changepoint
+  for (i in 1:length(tr)) {
+    if((tr[i]-l1)%%m==0){tc[i] <- (tr[i]-l1)%/%m+1}
+    else {tc[i] <- (tr[i]-l1)%/%m+2}
+  }
+  tcc <- c(tc[1],tc[2],tc[3],tc[4])
+  tc <- c(tc[1],tc[1]+1,tc[2],tc[2]+1,tc[3],tc[3]+1,tc[4],tc[4]+1)
+  powerrr <- 0
+  for (j in 1:length(tcc)) {
+    gro <- c(tcc[j],tcc[j]+1)
+    pandu <- intersect(S,gro)
+    if(length(pandu)!=0)
+    {powerrr <- powerrr+1}
+  }
+  powerrr_plus <- 0
+  for (j in 1:length(tcc)) {
+    gro_plus <- c(tcc[j],tcc[j]+1)
+    pandu_plus <- intersect(S_plus,gro_plus)
+    if(length(pandu_plus)!=0)
+    {powerrr_plus <- powerrr_plus+1}
+  }
+  if(length(S)>0){
+    fdr <- length(setdiff(S,tc))/(length(S))
+    mfdr <- length(setdiff(S,tc))/(length(S)+1/target)
+    tdf <- powerrr/length(tcc)
+  }else
+  {fdr <- 0
+  mfdr <- 0
+  tdf <- 0}
+  if(length(S_plus)>0){
+    fdr_plus <- length(setdiff(S_plus,tc))/(length(S_plus))
+    mfdr_plus <- length(setdiff(S_plus,tc))/(length(S_plus)+1/target)
+    tdf_plus <- powerrr_plus/length(tcc)
+  }else{
+    fdr_plus <- 0
+    mfdr_plus <- 0
+    tdf_plus <- 0}
+  obj <- list(fdr=fdr,mfdr=mfdr,tdf=tdf,fdr_plus=fdr_plus,mfdr_plus=mfdr_plus,
+              tdf_plus=tdf_plus,S=S,S_plus=S_plus)
+  return(obj)
+}
+```
+
+It is impossible to explain this method but we can see how to use the function. Consider a linear model with s changepoints located at $a_1, \dots, a_s$
+
+\begin{equation}
+\mathbf{y}=\left(\begin{array}{cccc}
+{\mathbf{x}_{\left(1: a_{1}\right)}} & {} & {} & {} \\
+{\mathbf{x}_{\left(a_{1}+1: a_{2}\right)}} & {\mathbf{x}_{\left(a_{1}+1: a_{2}\right)}} & {} & {} \\
+{\vdots} & {} & {\ddots} & {} \\
+{\mathbf{x}_{\left(a_{d}+1: n\right)}} & {\mathbf{x}_{\left(a_{d}+1: n\right)}} & {\cdots} & {\mathbf{x}_{\left(a_{d}+1: n\right)}}
+\end{array}\right)\left(\begin{array}{c}
+{\boldsymbol{\beta}_{0}} \\
+{\boldsymbol{\boldsymbol{\zeta}_{1}} \\
+{\vdots} \\
+{\boldsymbol{\sum_{l=1}^{d} \boldsymbol{\zeta}_{l}}
+\end{array}\right)+\boldsymbol{\epsilon}
+\end{equation}
+
+where $\boldsymbol{\epsilon} \sim \mathcal{N} (0,\sigma^2I_n)$. If we divide the samples to q intervals as follows:
+
+\begin{equation}
+\mathbf{y}=\left(\begin{array}{cccc}
+{\mathbf{x}_{(1)}} & {} & {} & {} \\
+{\mathbf{x}_{(2)}} & {\mathbf{x}_{(2)}} & {} & {} \\
+{\vdots} & {\vdots} & {\ddots} & {} \\
+{\mathbf{x}_{\left(q_{n}\right)}} & {\mathbf{x}_{\left(q_{n}\right)}} & {\cdots} & {\mathbf{x}_{\left(q_{n}\right)}}
+\end{array}\right)\left(\begin{array}{c}
+{\boldsymbol{\theta}_{(1)}^{0}} \\
+{\boldsymbol{\theta}_{(2)}^{0}} \\
+{\vdots} \\
+{\boldsymbol{\theta}_{\left(q_{n}\right)}^{0}}
+\end{array}\right)+\mathbf{X}_{\omega} \boldsymbol{\omega}+\epsilon
+\end{equation}
+
+and want to detect those intervals containing a changepoint. It is equivalent to select intervals with $\boldsymbol{\theta}_{(i)}^{0} \neq 0$. So the variable selection techniques can be applied to select intervals with FDR control. Here is an example containing 4 changepoints.
+
+```{r}
+library(SC19092)
+```
+
+```{r}
+set.seed(111)
+n <- 1000
+p <- 60
+np <- 4
+a <- 0.5
+AS <- 2
+amplitude <- c(AS,-AS)
+changepoint <- c(200,400,600,800) # Location of changepoints
+beta1 <- rep(0,p)
+be1 <- sample(p,3)
+beta1[be1] <- sample(amplitude, 3, replace = T)
+beta2 <- rep(0,p)
+be2 <- sample(p,3)
+beta2[be2] <- sample(amplitude, 3, replace = T)
+beta3 <- rep(0,p)
+be3 <- sample(p,3)
+beta3[be3] <- sample(amplitude, 3, replace = T)
+beta4 <- rep(0,p)
+be4 <- sample(p,3)
+beta4[be4] <- sample(amplitude, 3, replace = T)
+beta5 <- rep(0,p)
+be5 <- sample(p,3)
+beta5[be5] <- sample(amplitude, 3, replace = T)
+beta <- c(beta1,beta2,beta3,beta4,beta5)
+mu <- c(rep(0,p))
+target <- 0.2
+X <- matrix(rnorm(n*p), nrow = n)
+X1 <- X
+X2 <- X
+X3 <- X
+X4 <- X
+X5 <- X
+X2[(1:changepoint[1]),] <- 0
+X3[1:changepoint[2],] <- 0
+X4[1:changepoint[3],] <- 0
+X5[(1:changepoint[4]),] <- 0
+Xo=cbind(X1,X2,X3,X4,X5)
+Y=Xo%*%beta+rnorm(n)
+
+obj <- cplm(X, Y, target, 1, changepoint)
+res <- matrix(unlist(obj)[1:6], nrow = 2, byrow = T)
+colnames(res) <- c("FDR", "Modified FDR", "power")
+rownames(res) <- c("Knockoff", "Knockoff+")
+knitr::kable(res)
+```
+
+As we see, this method can select intervals with change points
+with high power while keep the FDR under desired level. 
+
+## 2 Inde_test
+
+The second function Inde_test aims at nonparametric test of independence between two random variables. The main idea of this test is to estimate the joint density and marginal density, respectively. And then test if the joint density is the product of two marginal density. The asymptotic distribution of the test statistic is used to compute p-value. The argument data is a matrix or dataframe with two columns. Then the independence of the two columns is tested. It returns the test statistic and p-value. 
+
+The method can be summarized as follows:
+
+Let \((X, Y)^{\prime}\) be a \((p+q) \times 1\) random vector with joint cdf \(F(x, y)\) and pdf \(f(x, y) .\) Further let \(F_{1}(x)\) and \(F_{2}(y)\) denote the marginal cdf of \(X\) and \(Y\) with marginal pdf \(f_{1}(x)\) and \(f_{2}(y),\) respectively. The null hypothesis of interest is
+\[
+H_{0}: f(x, y)=f_{1}(x) f_{2}(y)
+\]
+
+Intuitively, we will reject the null if the following integral is large.
+\(I=\int\left[f(x, y)-f_{1}(x) f_{2}(y)\right]^{2} d x d y\)
+
+Then we plug in the sample version.
+
+\begin{equation}
+\begin{aligned}
+\hat{I} &=\frac{1}{n} \sum_{i=1}^{n} \hat{f}_{-i}\left(X_{i}, Y_{i}\right)+\frac{1}{n^{2}} \sum_{i=1}^{n} \sum_{j=1}^{n} \hat{f}_{-i}\left(X_{i}\right) \hat{f}_{2,-i}\left(Y_{i}\right) \\
+&-\frac{2}{n} \sum_{i=1}^{n} \hat{f}_{1,-i}\left(X_{i}\right) \hat{f}_{2,-i}\left(Y_{i}\right) \\
+\text { where } \hat{f}_{-i} &\left(X_{i}, Y_{i}\right)=\frac{1}{n-1} \sum_{j \neq i} K_{h_{x}}\left(X_{j}-X_{i}\right) K_{h_{y}}\left(Y_{j}-Y_{i}\right) \\
+\hat{f}_{1,-i}\left(X_{i}\right) &=\frac{1}{n-1} \sum_{j \neq i} K_{h_{x}}\left(X_{j}-X_{i}\right), \text { and } \\
+\hat{f}_{2,-i}\left(Y_{i}\right) &=\frac{1}{n-1} \sum_{j \neq i} K_{h_{y}}\left(Y_{j}-Y_{i}\right), \text { with }
+\end{aligned}
+\end{equation}
+
+The asymptotic distribution is derived for this test statistic:
+
+Under some regularity conditions and \(H_{0}\) we have
+\[
+T=\frac{n\left(h_{x, 1} \cdots h_{x, p} h_{y, 1} \cdots h_{y, q}\right)^{1 / 2} \hat{I}}{\hat{\sigma}} \leadsto N(0,1)
+\]
+where \(\hat{\sigma}^{2}=\)
+\(2\left(n^{2} h_{x, 1} \cdots h_{x, p} h_{y, 1} \cdots h_{y, q}\right)^{-1} \sum_{i=1}^{n} \sum_{j \neq i}^{n} \mathcal{K}^{2}\left(\frac{X_{i}-X_{j}}{h_{x}}\right) \mathcal{K}^{2}\left(\frac{Y_{i}-Y_{j}}{h_{y}}\right)\)
+with, e.g., \(\mathcal{K}\left(\frac{X_{i}-X_{j}}{h_{x}}\right)=\prod_{S=1}^{p} K\left(\frac{X_{i s}-X_{j s}}{h_{x, s}}\right)\)
+
+The source R code for function _Inde_test_ is as follows:
+
+```{r,eval=FALSE}
+function(data){
+  x <- data[,1]
+  y <- data[,2]
+  n <- length(x)
+  jointloocv <- numeric(n)
+  hx <- h.ucv(x,deriv.order=0)$h # bandwidth selected by Unbiased CV
+  hy <- h.ucv(y,deriv.order=0)$h
+  for(i in 1:n){
+    jointloocv[i] <- mean(dnorm((x[-i]-x[i])/hx)*dnorm((y[-i]-y[i])/hy))/(hx*hy)
+  }
+  xloocv <- numeric(n)
+  for(i in 1:n){
+    xloocv[i] <- mean(dnorm((x[-i]-x[i])/hx)/hx)
+  }
+  yloocv <- numeric(n)
+  for(i in 1:n){
+    yloocv[i] <- mean(dnorm((y[-i]-y[i])/hy)/hy)
+  }
+  I <- mean(jointloocv)+mean(xloocv)*mean(yloocv)-2*mean(xloocv*yloocv)
+  X <- matrix(0,nrow=n,ncol=n)
+  Y <- matrix(0,nrow=n,ncol=n)
+  for(i in 1:n){
+    for(j in 1:n){
+      if (j!=i){
+        X[i,j] <- dnorm((x[i]-x[j])/hx)^2
+        Y[i,j] <- dnorm((y[i]-y[j])/hy)^2
+      }
+    }
+  }
+  sigma <- sqrt(2*sum(X*Y)/(n^2*hx*hy))
+  teststat <- n*sqrt(hx*hy)*I/sigma
+  cat("The value of test statistic is", teststat,"\n")
+  pvalue <- 1-pnorm(teststat) # One sided p-value
+  cat("p-value =",pvalue,"\n")
+  if(pvalue<0.05){
+    cat("Since p value is smaller than 0.05, we reject the independence assumption under significant level 0.05.")
+  }
+  else{
+    cat("Since p value is greater than 0.05, we accept the independence assumption under significant level 0.05.")
+  }
+}
+```
+
+And a simple example is to use this function to test the independence of eruption time and waiting time in dataset faithful.
+
+```{r}
+KDE_indep_test(faithful)
+plot(faithful)
+```
+
+So we see the test reject the null hypothesis.
+
+# Part 2. Solutions to homework
+
+## Homework 0
+
+Use knitr to produce at least three examples (texts, figures, tables).
+
+1. Examples of text
+
+We study the relations between mpg (as response) and hp & wt (as predictors) with linear regression.
+
+```{r}
+lm.fit <- lm(mpg ~ hp+wt,data=mtcars)
+summary(lm.fit)
+```
+
+So the regression equation is $mpg = 37.23-0.03hp-3.88wt$. All the coefficients are significant.
+
+2. Examples of figure
+
+We draw the plots to perform diagnosis.
+
+```{r}
+plot(lm.fit)
+```
+
+From the first and third plot we see some outliers. From the second plot the normal assumption is violated by these outliers. The last figure shows some points with high Cook's distance and may be leverage points.
+
+3. Examples of tables
+
+Let's see the correlation between these variables.
+
+```{r}
+knitr::kable(cor(mtcars[,1:4]))
+```
+
+## Homework 1
+
+1. The Rayleigh density [156, Ch. 18] is
+\[
+f(x) = \frac{x}{\sigma^2}e^{-x^2/(2\sigma^2))}, x\geq0, \sigma>0
+\]
+
+Develop an algorithm to generate random samples from a Rayleigh($\sigma$) distribution.
+Generate Rayleigh($\sigma$) samples for several choices of $\sigma$ > 0 and check
+that the mode of the generated samples is close to the theoretical mode $\sigma$
+(check the histogram).
+
+2.Generate a random sample of size 1000 from a normal location mixture. The
+components of the mixture have $N(0, 1)$ and $N(3, 1)$ distributions with mixing
+probabilities $p_1$ and $p_2$ = 1 − $p_1$. Graph the histogram of the sample with
+density superimposed, for $p_1$ = 0.75. Repeat with different values for $p_1$
+and observe whether the empirical distribution of the mixture appears to be
+bimodal. Make a conjecture about the values of $p_1$ that produce bimodal
+mixtures.
+
+3.Write a function to generate a random sample from a $W_d(\Sigma, n)$ (Wishart)
+distribution for n > d+ 1 ≥ 1, based on Bartlett’s decomposition.
+
+1.
+
+```{r}
+set.seed(521)
+# Inverse of CDF of Rayleigh
+den_rayleigh <- function(x,sigma) return(x*exp(-x^2/(2*sigma^2))/sigma^2)
+
+inv_Rayleigh <- function(x,sigma) return(sqrt(-2*sigma^2*log(1-x)))
+
+Rayleigh <- function(n,sigma) {
+  #Generate n random numbers from Rayleigh distribution with mode sigma
+  x <- runif(n)
+  return(inv_Rayleigh(x,sigma))
+}
+
+R1 <- Rayleigh(10000,1) # mode = 1
+R2 <- Rayleigh(10000,2) # mode = 2
+R3 <- Rayleigh(10000,3) # mode = 3
+
+hist(R1,breaks=60,freq=F,main="Histogram of Rayleigh(1)")
+xlim1 <- seq(0,max(R1),0.01)
+lines(xlim1, den_rayleigh(xlim1,1),col="red") # Theoretical density
+abline(v = 1, col="blue") # Mark the mode 
+
+hist(R2,breaks=60,freq=F,main="Histogram of Rayleigh(2)")
+xlim2 <- seq(0,max(R2),0.01)
+lines(xlim2, den_rayleigh(xlim2,2),col="red")
+abline(v = 2, col="blue")
+
+hist(R3,breaks=60,freq=F,main="Histogram of Rayleigh(3)")
+xlim3 <- seq(0,max(R3),0.01)
+lines(xlim3, den_rayleigh(xlim3,3),col="red")
+abline(v = 3, col="blue")
+```
+
+The mode is indeed close to theoretical mode. 
+
+2.
+
+```{r}
+mix_den <- function(x,p1){ # The density of mixture distribution
+  return(p1*dnorm(x)+(1-p1)*dnorm(x,3,1))
+}
+M1 <- mix_gauss(10000,0.75)
+hist(M1,breaks=60,freq=F,main=paste("Histogram of mixed gaussian with p1 = 0.75"))
+xlim1 <- seq(min(M1),max(M1),0.01)
+lines(xlim1, mix_den(xlim1,0.75),col="red")
+
+M2 <- mix_gauss(10000,0.5)
+hist(M2,breaks=60,freq=F,main=paste("Histogram of mixed gaussian with p1 = 0.5"))
+xlim2 <- seq(min(M2),max(M2),0.01)
+lines(xlim2, mix_den(xlim2,0.5),col="red")
+
+M3 <- mix_gauss(10000,0.6)
+hist(M3,breaks=60,freq=F,main=paste("Histogram of mixed gaussian with p1 = 0.6"))
+xlim3 <- seq(min(M3),max(M3),0.01)
+lines(xlim3, mix_den(xlim3,0.6),col="red")
+```
+
+Since the variance of two gaussian components are the same, the mixture appears to be bimodal when their proportions equal (both 0.5).
+
+3.
+
+```{r}
+Wishart(1,10,diag(rep(1,3)))
+Wishart(1,10,matrix(c(1,0.9,0.9,1),ncol=2,nrow=2))
+```
+
+## Homework 2
+
+1. Compute a Monte Carlo estimate of
+\[
+\int_0^{\pi/3}sin\,t \, \mathrm{d} t
+\]
+and compare your estimate with the exact value of the integral.
+
+The exact value is 0.5. For the Monte Carlo estimation, this integral can be expressed as 
+\[
+\int_0^{\pi/3}sin\,t \, \mathrm{d} t = \mathbb{E}[\frac{\pi}{3}U] \quad \mathrm{where} \; U \sim U(0,\frac{\pi}{3})
+\]. Thus we can estimate as follows:
+
+```{r}
+set.seed(521)
+n <- c(100,1000,10000,100000)
+estimates <- numeric(4)
+for (i in 1:4){
+  U <- runif(n[i],0,pi/3)
+  estimates[i] <- pi/3*mean(sin(U))
+}
+estimates #Compare the estimate with the exact value.
+```
+
+We see the estimates are closer to the integral as sample size grows.
+
+2. Use Monte Carlo integration with antithetic variables to estimate
+\[
+\int_0^1 \frac{e^{-x}}{1+x^2} \,\mathrm{d} x
+\]
+and find the approximate reduction in variance as a percentage of the variance
+without variance reduction.
+
+Let $f(x) = \frac{e^{-x}}{1+x^2}$ and we have 
+\[
+\int_0^1 \frac{e^{-x}}{1+x^2} \,\mathrm{d} x = \mathbb{E} f(X) \quad \mathrm{where} \, X\sim U(0,1)
+\]
+So we can generate $n/2$ samples from $U(0,1)$ and estimate the integral as
+\[
+\hat{I} = \frac{1}{n}\sum_{i=1}^{n/2}(f(X_i)+f(1-X_i))
+\]
+
+```{r}
+n <- 10000
+f <- function(x) return(exp(-x)/(1+x^2))
+simu1(n,T) #The estimator with antithetic variable
+m <- 1000
+naive <- numeric(m)
+anti <- numeric(m)
+for (i in 1:m){
+  naive[i] <- simu1(n,F)
+  anti[i] <- simu1(n,T)
+}
+(var(naive)-var(anti))/var(naive)
+```
+
+The approximate reduction in variance is 96%!
+
+3. Obtain the stratified importance sampling estimate in Example 5.13 and compare
+it with the result of Example 5.10.
+
+According to the text, we want to pick k intervals $(a_{i-1},a_i)$ such that $a_i = F^{-1}(i/k)$, where $k=5$. The inverse of cdf is 
+\[
+F^{-1}(x) = -\mathrm{ln}[1-(1-e^{-1})x]
+\]
+and we can calculate $a_i$ correspondingly. tp estimate the integral on each subinterval, we need to generate random numbers from
+\[
+\frac{5e^{-x}}{1-e^{-1}}, \; a_{i-1}<x<a_i
+\]
+I apply the inverse transformation method here. The inverse of cdf for density on $(a_{i-1},a_i)$ is
+\[
+y = -\mathrm{ln}(e^{-a_{i-1}}-\frac{1-e^{-1}}{5}x)
+\]
+
+```{r}
+n <- 10000
+k <- 5
+m <- n/k
+N <- 1000 # Number of replications 
+inv_F <- function(x) return(-log(1-(1-exp(-1))*x)) 
+a <- c(0,inv_F(c(0.2,0.4,0.6,0.8,1)))
+h <- function(i,x) return(-log(exp(-a[i])-(1-exp(-1))/5*x)) # Inverse of cdf for density on i-th subintervals
+g <- function(x) return(5*exp(-x)/(1-exp(-1))) # The density on subintervals
+# Pure importance sampling
+pure <- numeric(N)
+for (i in 1:N){
+  x <- inv_F(runif(n))
+  pure[i] <- mean(f(x)*exp(x)*(1-exp(-1)))
+}
+# Stratified importance sampling
+stra <- numeric(N)
+for (j in 1:N){
+  I <- numeric(k)
+  for (i in 1:k){
+    x <- h(i,runif(m))
+    I[i] <- mean(f(x)/g(x))
+  }
+  stra[j] <- sum(I)
+}
+mean(stra) # bagged stratified importance sampling estimates
+c(sd(pure),sd(stra)) # Compare the standard error
+```
+
+The stratified importance sampling estimators enjoy a one-fifth stardard error compared with "pure" importance sampling estimators.
+
+## Homework 3
+
+1. Suppose a 95% symmetric t-interval is applied to estimate a mean, but the
+sample data are non-normal. Then the probability that the confidence interval
+covers the mean is not necessarily equal to 0.95. Use aMonte Carlo experiment
+to estimate the coverage probability of the t-interval for random samples of
+$\chi^2(2)$ data with sample size n = 20. Compare your t-interval results with the
+simulation results in Example 6.4. (The t-interval should be more robust to
+departures from normality than the interval for variance.)
+
+The $1-\alpha$ symmetric t-interval is 
+\[
+[\bar{X}-\frac{S}{\sqrt{n}}t_{n-1}(\alpha/2),\bar{X}+\frac{S}{\sqrt{n}}t_{n-1}(\alpha/2)]
+\]
+In our setting $X_1,\dots,X_n$ i.i.d. $\sim \chi^2(2)$, where n = 20.
+
+```{r}
+set.seed(521)
+m <- 10000
+coverage <- numeric(m)
+n <- 20
+truemean <- 2
+alpha <- 0.05
+for (i in 1:m){
+  data <- rchisq(n,df=2)
+  S <- sd(data)
+  a <- mean(data)-S*qt(1-alpha/2,n-1)/sqrt(n)
+  b <- mean(data)+S*qt(1-alpha/2,n-1)/sqrt(n)
+  coverage[i] <- a<=truemean && truemean<=b
+}
+mean(coverage)
+```
+
+The estimated coverage probability is around 0.9178, which is less than the nominal level 0.95. Now we simulate according to example 6.4 with normal population replaced by $\chi^2(2)$.
+
+```{r}
+coverage <- numeric(m)
+trueva <- 4
+for (i in 1:m){
+  data <- rchisq(n,df=2)
+  UCL <- (n-1) * var(data) / qchisq(alpha, df=n-1)
+  coverage[i] <- trueva<=UCL
+}
+mean(coverage)
+```
+
+The estimated coverage probability of CI for variance is around 0.7817 when the true population is not normal. This is much lower than 0.9178, the coverage probability of t-interval for mean under the same setting. Thus we conclude the t-intervals are more robust than the intervals of variance when faced with departures from normality.
+
+2. Estimate the 0.025, 0.05, 0.95, and 0.975 quantiles of the skewness
+$\sqrt{b_1}$ under
+normality by a Monte Carlo experiment. Compute the standard error of the
+estimates from (2.14) using the normal approximation for the density (with
+exact variance formula). Compare the estimated quantiles with the quantiles
+of the large sample approximation
+$\sqrt{b_1}$ ≈ $N(0, 6/n)$.
+
+```{r}
+skew <- function(x){ # A function to calculate skewnwss from samples
+  numerator <- mean((x-mean(x))^3)
+  denominator <- mean((x-mean(x))^2)^(1.5)
+  return(numerator/denominator)
+}
+n <- 1000
+m <- 10000
+skews <- numeric(m)
+for (i in 1:m){
+  x <- rnorm(n)
+  skews[i] <- skew(x)
+}
+p <- c(0.025,0.05,0.95,0.975)
+quants <- quantile(skews,p)
+aquants <- qnorm(p,sd=sqrt(6/n))
+se <- sqrt(p*(1-p)/(n*(dnorm(aquants,0,sqrt(6*(n-2)/(n+1)/(n+3)))^2))) # Standard Error
+quants # Monte Carlo quantiles
+aquants # Asymptotic quantiles with normal approximation
+round(se,digits=4) # Estimated variance using large sample results of quantiles
+```
+
+The Monte Carlo quantiles of skewness are close to the quantiles of $N(0,6/n)$. 
+
+## Homework 4
+
+1. Estimate the power of the skewness test of normality against symmetric
+Beta($\alpha$, $\alpha$) distributions and comment on the results. Are the results different
+for heavy-tailed symmetric alternatives such as t($\nu$)?
+
+```{r}
+sk <- function(x) {
+#computes the sample skewness coeff.
+xbar <- mean(x)
+m3 <- mean((x - xbar)^3)
+m2 <- mean((x - xbar)^2)
+return( m3 / m2^1.5 )
+} 
+alpha <- 2:6
+n <- 1000 # Sample size
+m <- 1000 # No. of replications
+results <- matrix(0,nrow=m,ncol=length(alpha))
+colnames(results) <- paste("alpha=",alpha)
+for(k in 1:length(alpha)){
+  for(i in 1:m){
+    x <- rbeta(n,alpha[k],alpha[k])
+    skew <- sk(x)
+    test <- abs(sqrt(n/6)*skew)
+    results[i,k] <- test>qnorm(0.975)
+  }
+}
+colMeans(results)
+```
+
+The skewness test seldom rejects the null because the alternative distribution $Be(\alpha,\alpha)$ is a symmetric distribution and has zero skewness, which is same as normal distribution. Thus in this case the skewness test may have very small power and is unlikely to detect the non-normality of $Be(\alpha,\alpha)$ alternative in this example. 
+
+```{r}
+nu <- seq(from=5,to=15,by=2)
+results <- matrix(0,nrow=m,ncol=length(nu))
+for(k in 1:length(nu)){
+  for(i in 1:m){
+    x <- rt(n,nu[k])
+    skew <- sk(x)
+    test <- abs(sqrt(n/6)*skew)
+    results[i,k] <- test>qnorm(0.975)
+  }
+}
+colMeans(results)
+```
+
+The power when a heavy-tailed symmetric alternatives such as t($\nu$) is used is much greater than the power in $Be(\alpha,\alpha)$ case. Thus we conclude that the power of skewness test relies on the tail of the alternative distributions. As $\nu$ increases, $t(\nu)$ has a lighter tail and we see the power actually decreases, so we conclude the power skewness test increases if we the alternative has a heavier tail.
+
+2. Use Monte Carlo simulation to investigate whether the empirical Type I error
+rate of the t-test is approximately equal to the nominal significance level
+α, when the sampled population is non-normal. The t-test is robust to mild
+departures from normality. Discuss the simulation results for the cases where
+the sampled population is (i) $\chi^2(1)$, (ii) Uniform(0,2), and (iii) Exponential(
+rate=1). In each case, test H0 : $\mu=\mu_0$ vs H0 : $\mu \neq \mu_0$, where $\mu_0$ is the
+mean of $\chi^2(1)$, Uniform(0,2), and Exponential(1), respectively.
+
+I will use the function t.test because I am lazy and writing a function to perform t-test is simple.
+
+```{r}
+m <- 1000
+n <- seq(from=10,to=30,by=5)
+chisq <- matrix(0,nrow=m,ncol=length(n))
+unif <- matrix(0,nrow=m,ncol=length(n))
+expo <- matrix(0,nrow=m,ncol=length(n))
+for(k in 1:length(n)){
+  for(i in 1:m){
+    x1 <- rchisq(n[k],df=1)
+    x2 <- runif(n[k],min=0,max=2)
+    x3 <- rexp(n[k],1)
+    chisq[i,k] <- t.test(x1,mu=1)$p.value
+    unif[i,k] <- t.test(x2,mu=1)$p.value
+    expo[i,k] <- t.test(x3,mu=1)$p.value
+  }
+}
+chisq <- chisq < 0.05
+unif <- unif < 0.05
+expo <- expo < 0.05
+results <- rbind(colMeans(chisq),colMeans(unif),colMeans(expo))
+colnames(results) <- paste("n=",n)
+rownames(results) <- c("Chisq(1)","U(0,2)","Exp(1)")
+knitr::kable(results)
+```
+
+We see that t-test is very robust to departure from normality and can control the type I error at a low level. It performs very well in the U(0,2) case and a little worse in Exp(1) and $\chi^2(1)$. As sample size increases, we see the estimated type I error is closer to the nominal level due to the CLT.
+
+3. If we obtain the powers for two methods under a particular
+simulation setting with 10,000 experiments: say, 0.651 for one
+method and 0.676 for another method. Can we say the powers
+are different at 0.05 level?
+
+(1)What is the corresponding hypothesis test problem?
+
+(2)What test should we use? Z-test, two-sample t-test, paired-t
+test or McNemar test
+
+(3)What information is needed to test your hypothesis?
+
+(1) Denote the power of two tests as $p_1$ and $p_2$, respectively. Then we need to test:
+\[
+H_0: p_1=p_2 \quad VS \quad H_a: p_1 \neq p_2
+\]
+And we have samples $X_1,\dots,X_m \sim B(1,p_1)$ (whether the first test rejects the null) and $Y_1,\dots,Y_n \sim B(1,p_2)$ (whether the second test rejects the numm). (Here m=n=10000) 
+
+(2) 
+Suppose two tests are independent (e.g. the test statistics are independent), we can apply the Z-test as follows: 
+Under $H_0$, we denote $\hat{p}=\frac{\sum_{i=1}^{m}X_i+\sum_{j=1}^{n}Y_j}{m+n}$, then by the CLT we have 
+\[
+\frac{\bar{Y}-\bar{X}}{\sqrt{\hat{p}(1-\hat{p})}}\sqrt{\frac{mn}{m+n}} \stackrel{d}{\rightarrow} N(0,1)
+\]
+And we can perform test based on this large-sample result.
+
+I do not think other tests are applicable. The two sample t-test requires the normal assumption of the data while here we have Bernoulli samples. The paired t-test is not suitable because we do not know the pairs of $(X_i,Y_i)$. All we know is merely the number of $X_i$ and $Y_j$ that equal 1. Also the difference of two binary sample does not seem normal. 
+
+Last but not least, to perform McNemar test one needs to know #$X_i=1,Y_i=0$ and #$X_i=0,Y_i=1$. Here we do not this information and thus could not perform McNemar test. However, I think McNemar test is most appropriate in this setting because we do not necessarily have the independence of two samples $X_1,\dots,X_m$ and $Y_1,\dots,Y_n$. However, we do not have joint information about $(X,Y)$ and cannot perform this test.
+
+Finally, if we must make some decisions based on the available data, then we assume the independence of two samples $X_1,\dots,X_m$ and $Y_1,\dots,Y_n$ and perform Z-test.
+
+```{r}
+U <- (0.651-0.676)/sqrt(0.6635*(1-0.6635))*sqrt(10000^2/20000)
+U <- abs(U)
+c(U,qnorm(0.975))
+```
+
+The test statistic is greater than the critical value and thus we reject the null hypothesis, which states that the two tests share the same power.
+
+## Homework 5
+
+1. Efron and Tibshirani discuss the scor (bootstrap) test score data on 88 students
+who took examinations in five subjects [84, Table 7.1], [188, Table 1.2.1].
+The first two tests (mechanics, vectors) were closed book and the last three
+tests (algebra, analysis, statistics) were open book. Each row of the data
+frame is a set of scores (xi1, . . . , xi5) for the ith student. Use a panel display
+to display the scatter plots for each pair of test scores. Compare the plot with
+the sample correlation matrix. Obtain bootstrap estimates of the standard
+errors for each of the following estimates: $\hat{\rho}_{12}$ = $\hat{\rho}$(mec, vec), $\hat{\rho}_{34}$ = $\hat{\rho}$(alg,
+ana), $\hat{\rho}_{35}$ = $\hat{\rho}$(alg, sta), $\hat{\rho}_{45}$ = $\hat{\rho}$(ana, sta).
+
+```{r}
+options(warn=-1)
+library(boot)
+library(bootstrap)
+set.seed(521)
+data(scor)
+pairs(scor,main="paired scatter plots")
+knitr::kable(cor(scor))
+```
+
+According to the correlation matrix, we see that except the pairs (mec, ana) and (mec, sta), all other pairs appear to have medium to high correlation. This results are confirmed in the paired scatter plots.
+
+```{r}
+# Use boot function in package "boot"
+b.cor <- function(x,i) cor(x[i,1],x[i,2])
+ses1 <- numeric(4)
+r12.boot <- boot(data=scor[,1:2], statistic= b.cor, R=2000)
+ses1[1] <- sd(r12.boot$t)
+r34.boot <- boot(data=scor[,3:4], statistic= b.cor, R=2000)
+ses1[2] <- sd(r34.boot$t)
+r35.boot <- boot(data=scor[,c(3,5)], statistic= b.cor, R=2000)
+ses1[3] <- sd(r35.boot$t)
+r45.boot <- boot(data=scor[,4:5], statistic= b.cor, R=2000)
+ses1[4] <- sd(r45.boot$t)
+# Use my function
+ses2 <- numeric(4)
+ses2[1] <- corboot(scor[,1:2],2000)
+ses2[2] <- corboot(scor[,3:4],2000)
+ses2[3] <- corboot(scor[,c(3,5)],2000)
+ses2[4] <- corboot(scor[,4:5],2000)
+ses <- rbind(ses1,ses2)
+colnames(ses) <- c("mec, vec","alg, ana","alg, sta","ana, sta")
+knitr::kable(ses)
+```
+
+The results from my function are similar to those from boot.
+
+2. Conduct a Monte Carlo study to estimate the coverage probabilities of the
+standard normal bootstrap confidence interval, the basic bootstrap confidence
+interval, and the percentile confidence interval. Sample from a normal population
+and check the empirical coverage rates for the sample mean. Find
+the proportion of times that the confidence intervals miss on the left, and the
+porportion of times that the confidence intervals miss on the right.
+7.B Repeat Project 7.A for the sample skewness statistic. Compare the coverage
+rates for normal populations (skewness 0) and $\chi^2(5)$ distributions (positive
+skewness).
+
+```{r,eval=FALSE}
+sk <- function(x) {
+#computes the sample skewness coeff.
+xbar <- mean(x)
+m3 <- mean((x - xbar)^3)
+m2 <- mean((x - xbar)^2)
+return( m3 / m2^1.5 )
+} 
+b.sk <- function(x,i) return(sk(x[i]))
+m <- 100 # Number of replications
+n <- c(10,20,50,100,500,1000) # Sample size
+N <- length(n)
+results.norm <- matrix(0,nrow=N,ncol=3)
+results.basic <- matrix(0,nrow=N,ncol=3)
+results.perc <- matrix(0,nrow=N,ncol=3)
+results.bca <- matrix(0,nrow=N,ncol=3)
+for(i in 1:N){
+  result.norm <- matrix(0,nrow=m,ncol=3)
+  result.basic <- matrix(0,nrow=m,ncol=3)
+  result.perc <- matrix(0,nrow=m,ncol=3)
+  result.bca <- matrix(0,nrow=m,ncol=3)
+  for(k in 1:m){
+    x <- rnorm(n[i])
+    boo <- boot(data=x,statistic=b.sk,R=1000)
+    CI <- boot.ci(boo,type=c("norm","basic","perc","bca"))
+    CI.norm <- CI$normal[2:3]
+    CI.basic <- CI$basic[4:5]
+    CI.perc <- CI$percent[4:5]
+    CI.bca <- CI$bca[4:5]
+    result.norm[k,1] <- I(CI.norm[1]>0)
+    result.norm[k,2] <- I(CI.norm[1]<=0)*I(CI.norm[2]>=0)
+    result.norm[k,3] <- I(CI.norm[2]<0)
+    result.basic[k,1] <- I(CI.basic[1]>0)
+    result.basic[k,2] <- I(CI.basic[1]<=0)*I(CI.basic[2]>=0)
+    result.basic[k,3] <- I(CI.basic[2]<0)
+    result.perc[k,1] <- I(CI.perc[1]>0)
+    result.perc[k,2] <- I(CI.perc[1]<=0)*I(CI.perc[2]>=0)
+    result.perc[k,3] <- I(CI.perc[2]<0)
+    result.bca[k,1] <- I(CI.bca[1]>0)
+    result.bca[k,2] <- I(CI.bca[1]<=0)*I(CI.bca[2]>=0)
+    result.bca[k,3] <- I(CI.bca[2]<0)
+  }
+  results.norm[i,] <- apply(result.norm,2,mean)
+  results.basic[i,] <- apply(result.basic,2,mean)
+  results.perc[i,] <- apply(result.perc,2,mean)
+  results.bca[i,] <- apply(result.bca,2,mean)
+}
+colnames(results.norm) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.basic) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.perc) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.bca) <- c("Missing on the left","Covered","Missing on the right")
+rownames(results.norm) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.basic) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.perc) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.bca) <- paste("n=",c(10,20,50,100,500,1000))
+```
+
+Then we display the results for normal distribution.
+
+```{r, eval=FALSE}
+knitr::kable(results.norm) # Normal interval
+knitr::kable(results.basic) # Basic interval
+knitr::kable(results.perc) # Percentile interval
+knitr::kable(results.bca) # BCA interval
+```
+
+Then we repeat analysis for $\chi^2(5)$.
+
+```{r, eval=FALSE}
+true_sk <- sqrt(8/5)
+results.norm <- matrix(0,nrow=N,ncol=3)
+results.basic <- matrix(0,nrow=N,ncol=3)
+results.perc <- matrix(0,nrow=N,ncol=3)
+results.bca <- matrix(0,nrow=N,ncol=3)
+for(i in 1:N){
+  result.norm <- matrix(0,nrow=m,ncol=3)
+  result.basic <- matrix(0,nrow=m,ncol=3)
+  result.perc <- matrix(0,nrow=m,ncol=3)
+  result.bca <- matrix(0,nrow=m,ncol=3)
+  for(k in 1:m){
+    x <- rchisq(n[i],df=5)
+    boo <- boot(data=x,statistic=b.sk,R=1000)
+    CI <- boot.ci(boo,type=c("norm","basic","perc","bca"))
+    CI.norm <- CI$normal[2:3]
+    CI.basic <- CI$basic[4:5]
+    CI.perc <- CI$percent[4:5]
+    CI.bca <- CI$bca[4:5]
+    result.norm[k,1] <- I(CI.norm[1]>true_sk)
+    result.norm[k,2] <- I(CI.norm[1]<=true_sk)*I(CI.norm[2]>=true_sk)
+    result.norm[k,3] <- I(CI.norm[2]<true_sk)
+    result.basic[k,1] <- I(CI.basic[1]>true_sk)
+    result.basic[k,2] <- I(CI.basic[1]<=true_sk)*I(CI.basic[2]>=true_sk)
+    result.basic[k,3] <- I(CI.basic[2]<true_sk)
+    result.perc[k,1] <- I(CI.perc[1]>true_sk)
+    result.perc[k,2] <- I(CI.perc[1]<=true_sk)*I(CI.perc[2]>=true_sk)
+    result.perc[k,3] <- I(CI.perc[2]<true_sk)
+    result.bca[k,1] <- I(CI.bca[1]>true_sk)
+    result.bca[k,2] <- I(CI.bca[1]<=true_sk)*I(CI.bca[2]>=true_sk)
+    result.bca[k,3] <- I(CI.bca[2]<true_sk)
+  }
+  results.norm[i,] <- apply(result.norm,2,mean)
+  results.basic[i,] <- apply(result.basic,2,mean)
+  results.perc[i,] <- apply(result.perc,2,mean)
+  results.bca[i,] <- apply(result.bca,2,mean)
+}
+colnames(results.norm) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.basic) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.perc) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.bca) <- c("Missing on the left","Covered","Missing on the right")
+rownames(results.norm) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.basic) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.perc) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.bca) <- paste("n=",c(10,20,50,100,500,1000))
+```
+
+Then we display the results for $\chi^2(5)$.
+
+```{r, eval=FALSE}
+knitr::kable(results.norm) # Normal interval
+knitr::kable(results.basic) # Basic interval
+knitr::kable(results.perc) # Percentile interval
+knitr::kable(results.bca) # BCA interval
+```
+
+We see that the coverage proportion for normal population is close to 0.95 and thus is robust. However, when sample size is small, the coverage proportion for $\chi^2(5)$ is way smaller than 0.95 and thus not robust. As the sample size increases, the coverage probability also increases, which corresponds to the large sample result of bootstrap. Also it seems that percentile interval works best in normal case while BCA interval works best in $\chi^2(5)$ case.
+
+## Homework 6 
+
+1. Efron and Tibshirani discuss the following example [84,
+Ch. 7]. The five-dimensional scores data have a 5 × 5 covariance matrix $\Sigma$,
+with positive eigenvalues $\lambda_1,\dots,\lambda_5$. In principal components analysis,
+\[
+\theta=\frac{\lambda_1}{\sum_{i=1}^5 \lambda_i}
+\]
+measures the proportion of variance explained by the first principal component.
+Let $\hat{\lambda}_1,\dots,\hat{\lambda}_5$ be the eigenvalues of $\hat{\Sigma}$, where $\hat{\Sigma}$ is the MLE of $\Sigma$.
+Compute the sample estimate
+\[
+\hat{\theta}=\frac{\hat{\lambda}_1}{\sum_{i=1}^5 \hat{\lambda}_i}
+\]
+ Obtain the jackknife estimates of bias and standard
+error of $\hat{\theta}$.
+
+```{r}
+library(bootstrap)
+set.seed(521)
+data(scor)
+n <- nrow(scor)
+S <- cov(scor)
+e <- eigen(S)
+theta_hat <- e$values[1]/sum(e$values)
+alpha <- 0.05
+#Jackknife
+theta_jack <- numeric(n)
+for (i in 1:n){
+  S <- cov(scor[-i,])
+  e <- eigen(S)
+  theta_jack[i] <- e$values[1]/sum(e$values)
+}
+bias_jack <- (n-1)*(mean(theta_jack)-theta_hat)
+se_jack <- sqrt(mean((theta_jack-mean(theta_jack))^2)*(n-1))
+A <- matrix(c(bias_jack,se_jack),ncol=2)
+colnames(A) <- c("Bias.Jackknife","SE.Jackknife")
+knitr::kable(A)
+```
+
+2. In Example 7.18, leave-one-out (n-fold) cross validation was used to select
+the best fitting model. Repeat the analysis replacing the Log-Log model
+with a cubic polynomial model. Which of the four models is selected by the
+cross validation procedure? Which model is selected according to maximum
+adjusted $R^2$?
+
+```{r}
+library(DAAG)
+attach(ironslag)
+n <- length(magnetic)
+e1 <- e2 <- e3 <- e4 <- numeric(n)
+for(i in 1:n){
+  x <- chemical[-i]
+  y <- magnetic[-i]
+  # Linear Model
+  lm1 <- lm(y~x)
+  yhat1 <- predict(lm1,newdata=list(x=chemical[i]))
+  e1[i] <- yhat1-magnetic[i]
+  # Quadratic Model
+  lm2 <- lm(y~x+I(x^2))
+  yhat2 <- predict(lm2,newdata=list(x=chemical[i]))
+  e2[i] <- yhat2-magnetic[i]
+  # Exponential Model
+  lm3 <- lm(log(y)~x)
+  yhat3 <- exp(predict(lm3,newdata=list(x=chemical[i])))
+  e3[i] <- yhat3-magnetic[i]
+  # Cubic Model
+  lm4 <- lm(y~x+I(x^2)+I(x^3))
+  yhat4 <- predict(lm4,newdata=list(x=chemical[i]))
+  e4[i] <- yhat4-magnetic[i]
+}
+MSE <- matrix(c(mean(e1^2),mean(e2^2),mean(e3^2),mean(e4^2)),ncol=4)
+colnames(MSE) <- c("Linear","Quadratic","Exponential","Cubic")
+knitr::kable(MSE)
+```
+
+So we should still select the quadratic model according to the LOOCV.
+
+The adjusted $R^2$ is another way to perform model selection. 
+The $R^2$ of a linear model is defined as
+\[
+R^2=1-\frac{RSS}{SST}
+\]
+where RSS is the residual sum of squares and SST is the variation of response variable.
+
+The adjusted $R^2$ penalizes the number of predictors in the model. It is defined as
+\[
+R_{adj}^2 = 1-\frac{n-1}{n-p-1}(1-R^2)
+\]
+where p is number of predictors and if we take intercept into account, the dimension becomes p+1.
+
+```{r}
+lm1 <- lm(magnetic~chemical)
+lm2 <- lm(magnetic~chemical+I(chemical^2))
+lm3 <- lm(log(magnetic)~chemical)
+lm4 <- lm(magnetic~chemical+I(chemical^2)+I(chemical^3))
+rsquare1 <- 1-sum(residuals(lm1)^2)/(var(magnetic)*(n-1))
+adj1 <- 1-(n-1)*(1-rsquare1)/(n-2)
+rsquare2 <- 1-sum(residuals(lm2)^2)/(var(magnetic)*(n-1))
+adj2 <- 1-(n-1)*(1-rsquare2)/(n-3)
+rsquare3 <- 1-sum(residuals(lm3)^2)/(var(log(magnetic))*(n-1))
+adj3 <- 1-(n-1)*(1-rsquare3)/(n-2)
+rsquare4 <- 1-sum(residuals(lm4)^2)/(var(magnetic)*(n-1))
+adj4 <- 1-(n-1)*(1-rsquare4)/(n-4)
+AR2 <- matrix(c(adj1,adj2,adj3,adj4),ncol=4)
+colnames(AR2) <- c("Linear","Quadratic","Exponential","Cubic")
+knitr::kable(AR2)
+```
+
+According to the adjusted $R^2$, we should still select the Quadratic model since it has the largest adjusted $R^2$ value.
+
+## Homework 7
+
+1. The Count 5 test for equal variances in Section 6.4 is based on the maximum
+number of extreme points. Example 6.15 shows that the Count 5 criterion
+is not applicable for unequal sample sizes. Implement a permutation test for
+equal variance based on the maximum number of extreme points that applies
+when sample sizes are not necessarily equal.
+
+Suppose we have two centralized samples $(X_1,\dots,X_{n_1})$ and $(Y_1,\dots,Y_{n_2})$. If they come from population with same variance, we may pool the samples as $Z=(Z_1,\dots,Z_n)$ where $n=n_1+n_2$. Let $\pi(n)$ be a permutation of $\{1,\dots,n\}$ and we take first $n_1$ components in $(Z_{\pi_1},\dots,Z_{\pi_n})$ to be $X^*$ and the rest to be $Y^*$. Then under $H_0$ the maximum number of extreme points computed from $(X^*,Y^*)$ should have the same probability to occur as the maximum number of extreme points computed from original sample. Then we can apply permutation test to compute the APL and test equality of variance.
+
+```{r}
+library(boot)
+extremetest <- function(z,dims){
+  boot.obj <- boot(data=z,statistic=b.maxout,R=999,sim="permutation",dims=dims)
+  ts <- c(boot.obj$t0,boot.obj$t)
+  p.value <- mean(ts>=ts[1])
+  return(p.value)
+}
+# Return to Example 6.15 and estimate the type I error under significant level 0.05
+n1 <- 20
+n2 <- 30
+mu1 <- 0
+mu2 <- 10
+sigma1 <- sigma2 <- 1
+m <- 100
+set.seed(521)
+pvalues <- numeric(m)
+for(i in 1:m){
+  x <- rnorm(n1, mu1, sigma1)
+  y <- rnorm(n2, mu2, sigma2)
+  x <- x-mean(x)
+  y <- y-mean(y)
+  pvalues[i] <- extremetest(c(x,y),c(n1,n2))
+}
+mean(pvalues<0.05)
+# n2 = 50
+n1 <- 20
+n2 <- 50
+mu1 <- mu2 <- 0
+sigma1 <- sigma2 <- 1
+m <- 100
+set.seed(521)
+pvalues <- numeric(m)
+for(i in 1:m){
+  x <- rnorm(n1, mu1, sigma1)
+  y <- rnorm(n2, mu2, sigma2)
+  x <- x-mean(x)
+  y <- y-mean(y)
+  pvalues[i] <- extremetest(c(x,y),c(n1,n2))
+}
+mean(pvalues<0.05)
+```
+
+Compared with the estimated type I error (0.1064 and 0.2934) in example 6.15, we see that the permutation test can control the type I error at nominal level.
+
+2. Power comparison (distance correlation test versus ball
+covariance test)
+
+Model 1: $Y = X/4 + e$
+
+Model 2: $Y = X/4 × e$
+
+$X\sim N(0_2, I_2)$ ,  $e\sim N(0_2, I_2)$ , $X$ and $e$ are independent.
+ 
+ 
+```{r}
+library(Ball)
+dCov <- function(x, y) {
+  x <- as.matrix(x)
+  y <- as.matrix(y)
+  n <- nrow(x)
+  m <- nrow(y)
+  if (n != m || n < 2) stop("Sample sizes must agree")
+  if (! (all(is.finite(c(x, y)))))
+    stop("Data contains missing or infinite values")
+  Akl <- function(x) {
+    d <- as.matrix(dist(x))
+    m <- rowMeans(d)
+    M <- mean(d)
+    a <- sweep(d, 1, m)
+    b <- sweep(a, 2, m)
+    return(b + M)
+  }
+  A <- Akl(x)
+  B <- Akl(y)
+  dCov <- sqrt(mean(A * B))
+  return(dCov)
+}
+ndCov2 <- function(z, ix, dims) {
+  p <- dims[1]
+  q1 <- dims[2] + 1
+  d <- p + dims[2]
+  x <- z[ , 1:p] 
+  y <- z[ix, q1:d] #permute rows of y
+  return(nrow(z) * dCov(x, y)^2)
+}
+m <- 100 # Number of replications
+N <- seq(from=20,to=120,by=20) # Sample size
+library(snowfall)
+sfInit(parallel=T,cpus=parallel::detectCores())
+sfLibrary(boot)
+sfLibrary(Ball)
+sfExport("N","m")
+sfExport("dCov","ndCov2")
+model1.power <- sfSapply(N,function(n){
+  result1 <- numeric(m)
+  result2 <- numeric(m)
+  for(i in 1:m){
+    x <- matrix(rnorm(2*n),ncol=2)
+    e <- matrix(rnorm(2*n),ncol=2)
+    y <- x/4 + e
+    z <- cbind(x,y)
+    boot.obj <- boot(data=z,statistic=ndCov2,R=999,dims=c(2,2),sim="permutation")
+    tb <- c(boot.obj$t0, boot.obj$t)
+    p1 <- mean(tb>=tb[1])
+    result1[i] <- ifelse(p1 < 0.05,1,0)
+    p2 <- bcov.test(x,y,R=999,seed=521*i-n)$p.value
+    result2[i] <- ifelse(p2 < 0.05,1,0)
+  }
+  return(c(mean(result1),mean(result2)))
+})
+sfStop()
+colnames(model1.power) <- paste("n=",N)
+rownames(model1.power) <- c("Distance Correlation","Ball Covariance")
+knitr::kable(model1.power)
+plot(N,model1.power[1,],main="Power Comparison",type="p",pch=4,col="red",xlab="Sample Size",ylab="Power",ylim=c(0,1))
+lines(N,model1.power[1,],col="red")
+points(N,model1.power[2,],type="p",pch=20,col="blue")
+lines(N,model1.power[2,],col="blue")
+legend("topleft",c("Distance","Ball"),pch=c(4,20),col=c("red","blue"),cex=1)
+
+sfInit(parallel=T,cpus=parallel::detectCores())
+sfLibrary(boot)
+sfLibrary(Ball)
+sfExport("N","m")
+sfExport("dCov","ndCov2")
+model2.power <- sfSapply(N,function(n){
+  result1 <- numeric(m)
+  result2 <- numeric(m)
+  for(i in 1:m){
+    x <- matrix(rnorm(2*n),ncol=2)
+    e <- matrix(rnorm(2*n),ncol=2)
+    y <- x/4 * e
+    z <- cbind(x,y)
+    boot.obj <- boot(data=z,statistic=ndCov2,R=999,dims=c(2,2),sim="permutation")
+    tb <- c(boot.obj$t0, boot.obj$t)
+    p1 <- mean(tb>=tb[1])
+    result1[i] <- ifelse(p1 < 0.05,1,0)
+    p2 <- bcov.test(x,y,R=999,seed=521*i-n)$p.value
+    result2[i] <- ifelse(p2 < 0.05,1,0)
+  }
+  return(c(mean(result1),mean(result2)))
+})
+sfStop()
+colnames(model2.power) <- paste("n=",N)
+rownames(model2.power) <- c("Distance Correlation","Ball Covariance")
+knitr::kable(model2.power)
+plot(N,model2.power[1,],main="Power Comparison",type="p",pch=4,col="red",xlab="Sample Size",ylab="Power",ylim=c(0,1))
+lines(N,model2.power[1,],col="red")
+points(N,model2.power[2,],type="p",pch=20,col="blue")
+lines(N,model2.power[2,],col="blue")
+legend("topleft",c("Distance","Ball"),pch=c(4,20),col=c("red","blue"),cex=1)
+```
+ 
+As we see in the plot, location based method like distance correlation test is more powerful for first model, where the $X-Y$ relation is additive. However, scaling based method like ball covariance test is more likely to detect the scaling  relation between $X$ and $Y$ in the second model and is more powerful.
+
+## Homework 8
+
+Implement a random walk Metropolis sampler for generating the standard
+Laplace distribution (see Exercise 3.2). For the increment, simulate from a
+normal distribution. Compare the chains generated when different variances
+are used for the proposal distribution. Also, compute the acceptance rates of
+each chain.
+
+```{r}
+set.seed(521)
+N <- 20000
+sigma <- c(.05, .5, 2, 16)
+x0 <- 0
+chain1 <- rw.Metropolis(sigma[1], x0, N)
+chain2 <- rw.Metropolis(sigma[2], x0, N)
+chain3 <- rw.Metropolis(sigma[3], x0, N)
+chain4 <- rw.Metropolis(sigma[4], x0, N)
+rej <- matrix(c(chain1[[2]],chain2[[2]],chain3[[2]],chain4[[2]])/N,nrow=1)
+colnames(rej)=paste("Scaling parameter = ",sigma)
+knitr::kable(rej)
+
+# Trace plot
+chains <- cbind(chain1[[1]],chain2[[1]],chain3[[1]],chain4[[1]])
+for(i in 1:4){
+  plot(1:1000,chains[1:1000,i],type="l",xlab=paste("Scaling parameter = ",sigma[i]),ylab="Chain",ylim=range(chains[,i]))
+} 
+# Cumulative Mean plot
+for(i in 1:4){
+  plot(cumsum(chains[,i])/1:N,type="l",main=paste("Culmulative mean plot sd =",sigma[i]),ylab="Mean of chain")
+  abline(h=mean(chains[,i]),col="red")
+}
+qpoints <- seq(from=0.6,to=0.9,by=0.1)
+qpoints <- c(qpoints,0.95)
+quantlap <- function(alpha){
+  return(-log(2*(1-alpha)))
+}
+quant <- quantlap(qpoints)
+truequant <- c(-rev(quant),0,quant)
+a <- c(.05, seq(.1, .9, .1), .95)
+rw <- cbind(chain1$x, chain2$x, chain3$x, chain4$x)
+mc <- rw[501:N, ]
+Qrw <- apply(mc, 2, function(x) quantile(x, a))
+Qrw <- cbind(truequant,Qrw)
+colnames(Qrw) <- c("True",paste("sigma =",sigma))
+rownames(Qrw) <- paste(a*100,"%")
+knitr::kable(Qrw)
+```
+
+According to the rate of rejection, the second and third plot are good. From the trace plot and cululative mean plot we see that the third plot converges faster than the second plot. The quantiles also show that the third chain is good. So we conclude that the third plot (corresponding to $\sigma=2$) is the best. The scaling parameter of proposal distribution indeed has a large impact on the chain.
+
+## Homework 9
+
+1. The natural logarithm and exponential functions are inverses of each other,
+so that mathematically log(exp x) = exp(logx) = x. Show by example that
+this property does not hold exactly in computer arithmetic. Does the identity
+hold with near equality? (See all.equal.)
+
+```{r}
+# Example 1 
+a <- log(exp(100))
+b <- exp(log(100))
+a-b # Not exactly 0
+isTRUE(all.equal(a,b)) # Hold with near equality
+# Example 2
+a <- log(exp(0.001))
+b <- exp(log(0.001))
+a-b # Not exactly 0
+isTRUE(all.equal(a,b)) # Hold with near equality
+```
+
+Write a function to solve the equation
+
+\begin{equation}
+ \frac{2 \Gamma\left(\frac{k}{2}\right)}{\sqrt{\pi(k-1)} \Gamma\left(\frac{k-1}{2}\right)} \int_{0}^{c_{k-1}}\left(1+\frac{u^{2}}{k-1}\right)^{-k / 2} d u = \frac{2 \Gamma\left(\frac{k+1}{2}\right)}{\sqrt{\pi k} \Gamma\left(\frac{k}{2}\right)} \int_{0}^{c_{k}}\left(1+\frac{u^{2}}{k}\right)^{-(k+1) / 2} d u \\ \text { for } a, \text { where } \\  c_{k}=\sqrt{\frac{a^{2} k}{k+1-a^{2}}} 
+\end{equation}
+
+Compare the solutions with the points $A(k)$ in Exercise 11.4.
+
+```{r}
+k <- c(4,25,100,500,1000) # No need to solve for k = 4:25
+f <- function(a,k){
+  c1 <- sqrt(a^2*(k-1)/(k-a^2))
+  f1 <- function(u) return((1+u^2/(k-1))^(-k/2))
+  I1 <- integrate(f1,lower=0,upper=c1)$value
+  c2 <- sqrt(a^2*k/(k+1-a^2))
+  f2 <- function(u) return((1+u^2/k)^(-(k+1)/2))
+  I2 <- integrate(f2,lower=0,upper=c2)$value
+  left <- exp(lgamma(k/2)-lgamma((k-1)/2))*I1/sqrt(k-1)
+  right <- exp(lgamma((k+1)/2)-lgamma(k/2))*I2/sqrt(k)
+  return(left-right)
+}
+A5 <- numeric(5)
+# Get some interval with opposite signs at points
+uppers <- c(sqrt(k[1]),sqrt(k[2])/2,sqrt(k[3])/2,sqrt(k[4])/5,sqrt(k[5])/5)
+for(i in 1:5){
+  A5[i] <- uniroot(f,c(0.1,uppers[i]),k=k[i])$root
+}
+A5 <- matrix(A5,nrow=1)
+colnames(A5) <- paste("k =",k)
+knitr::kable(A5)
+```
+
+Of course it should be the same as ex 11.4 since 11.5 merely expresses 11.4 with integral.
+
+2. Let the three alleles be A, B, and O with allele frequencies p,
+q, and r. The 6 genotype frequencies under HWE and
+complete counts are as follows.
+
+Observed data: nA· = nAA + nAO = 28 (A-type),
+nB· = nBB + nBO = 24 (B-type), nOO = 41 (O-type),
+nAB = 70 (AB-type).
+
+Use EM algorithm to solve MLE of p and q (consider missing
+data nAA and nBB). Show that the log-maximum likelihood values in M-steps are
+increasing via line plot.
+
+With the estimates $(p^{t},q^t,r^t)$ at $t-th$ step, one can easily obtain the E-Step and M-step for this model as follows:
+
+E-Step: Calculate
+\[
+n_{AA}^t = n_{A.}\frac{p^t}{p^t+2r^t}\\
+n_{AO}^t = n_{A.}\frac{2r^t}{p^t+2r^t}\\
+n_{BB}^t = n_{B.}\frac{q^t}{q^t+2r^t}\\
+n_{BO}^t = n_{B.}\frac{2r^t}{q^t+2r^t}
+\]
+
+M-Step: Obtain the estimates at $(t+1)-th$ step:
+\[
+p^{t+1}=\frac{2n_{AA}^t+n_{AO}^t+n_{AB}^t}{2n}\\
+q^{t+1}=\frac{2n_{BB}^t+n_{BO}^t+n_{AB}^t}{2n}\\
+r^{t+1}=1-p^{t+1}-q^{t+1}
+\]
+
+```{r}
+nA <- 28
+nB <- 24
+nO <- 41
+nAB <- 70
+n <- nA+nB+nO+nAB
+result <- EMABO(10,nA,nB,nO,nAB,n)
+p <- result$p
+q <- result$q
+r <- result$r
+likes <- result$like
+res <- matrix(c(p,q,r),nrow=1)
+colnames(res) <- c("p","q","r")
+knitr::kable(res)
+plot(likes,type="l",main="Incomplete log-likelihood")
+```
+
+We see the algorithm converges quickly in this example.
+
+## Homework 10
+
+1. Use both for loops and lapply() to fit linear models to the
+mtcars using the formulas stored in this list:
+
+formulas <- list(
+
+mpg ~ disp,
+
+mpg ~ I(1 / disp),
+
+mpg ~ disp + wt,
+
+mpg ~ I(1 / disp) + wt
+
+)
+
+```{r}
+formulas <- list(
+mpg ~ disp,
+mpg ~ I(1 / disp),
+mpg ~ disp + wt,
+mpg ~ I(1 / disp) + wt
+)
+# For loop
+out3 <- vector("list", length(formulas))
+for(i in seq_along(formulas)){
+  out3[[i]] <- lm(formulas[[i]],data=mtcars)
+}
+out3
+#Lapply
+lapply(formulas,function(formula) lm(formula, data=mtcars))
+```
+
+They are the same as they should be.
+
+2. Fit the model mpg ~ disp to each of the bootstrap replicates
+of mtcars in the list below by using a for loop and lapply().
+Can you do it without an anonymous function?
+
+bootstraps <- lapply(1:10, function(i) {
+
+rows <- sample(1:nrow(mtcars), rep = TRUE)
+
+mtcars[rows, ]
+
+})
+
+```{r}
+bootstraps <- lapply(1:10, function(i) {
+rows <- sample(1:nrow(mtcars), rep = TRUE)
+mtcars[rows, ]
+})
+
+out4 <- vector("list", length(bootstraps))
+for(i in seq_along(bootstraps)){ 
+  out4[[i]] <- lm(mpg~disp, data = bootstraps[[i]])
+}
+out4[1:2] # Just check first two models
+lms <- lapply(bootstraps, lm, formula = mpg~disp)
+lms[1:2]
+```
+
+3. For each model in the previous two exercises, extract R2 using
+the function below.
+
+rsq <- function(mod) summary(mod)$r.squared
+
+```{r}
+rsq <- function(mod) summary(mod)$r.squared
+unlist(lapply(out3, rsq))
+unlist(lapply(out4, rsq))
+```
+
+4. The following code simulates the performance of a t-test for
+non-normal data. Use sapply() and an anonymous function
+to extract the p-value from every trial.
+
+trials <- replicate(
+
+100,
+
+t.test(rpois(10, 10), rpois(7, 10)),
+
+simplify = FALSE
+
+)
+
+Extra challenge: get rid of the anonymous function by using
+[[ directly.
+
+```{r}
+trials <- replicate(
+100,
+t.test(rpois(10, 10), rpois(7, 10)),
+simplify = FALSE
+)
+pvalue1 <- sapply(trials, function(test) test$p.value)
+head(pvalue1)
+pvalue2 <- sapply(trials, "[[", "p.value")
+head(pvalue2)
+```
+
+5. Implement mcsapply(), a multicore version of sapply(). Can
+you implement mcvapply(), a parallel version of vapply()?
+Why or why not?
+
+```{r}
+library(parallel)
+mcsapply <- function(x, f, mc.cores, ...){
+  res <- mclapply(x, f, mc.cores = mc.cores)
+  simplify2array(res)
+}
+
+mcvapply <- function(x, f, f.value, mc.cores, ...){
+  out <- matrix(rep(f.value, length(x)), nrow = length(x))
+  res <- mclapply(x, f, mc.cores = mc.cores)
+  for(i in seq_along(x)){
+    stopifnot(
+      length(res[[i]]) == length(f.value),
+      typeof(res[[i]]) == typeof(f.value)
+    )
+    out[i,] <- res[[i]]
+  }
+  drop(out)
+}
+
+# Use examples in textbook to check
+boot_df <- function(x) x[sample(nrow(x), rep = T), ]
+rsquared <- function(mod) summary(mod)$r.square
+boot_lm <- function(i) {
+rsquared(lm(mpg ~ wt + disp, data = boot_df(mtcars)))
+}
+a <- mcsapply(1:500, boot_lm, mc.cores = 2)
+head(a)
+b <- mcvapply(1:500, boot_lm, numeric(1), mc.cores = 2)
+head(b)
+```
+
+## Homework 11
+
+You have already written an R function for Exercise 9.4 (page
+277, Statistical Computing with R). Rewrite an Rcpp function
+for the same task.
+
+Compare the generated random numbers by the two functions
+using qqplot.
+
+Campare the computation time of the two functions with
+microbenchmark.
+
+Comments your results.
+
+```{r}
+library(Rcpp)
+library(microbenchmark)
+set.seed(521)
+# R-Version
+N <- 20000
+sigma <- c(.05, .5, 2, 16)
+x0 <- 0
+Rrw1 <- rw.Metropolis(sigma[1], x0, N)
+Rrw2 <- rw.Metropolis(sigma[2], x0, N)
+Rrw3 <- rw.Metropolis(sigma[3], x0, N)
+Rrw4 <- rw.Metropolis(sigma[4], x0, N)
+Crw1 <- rwcpp(sigma[1], x0, N)
+Crw2 <- rwcpp(sigma[2], x0, N)
+Crw3 <- rwcpp(sigma[3], x0, N)
+Crw4 <- rwcpp(sigma[4], x0, N)
+racc1 <-  1-c(Rrw1[[2]], Rrw2[[2]], Rrw3[[2]], Rrw4[[2]])/N
+racc2 <-  1-c(Crw1[[2]], Crw2[[2]], Crw3[[2]], Crw4[[2]])/N
+racc <- rbind(racc1, racc2)
+colnames(racc) <- paste("Scaling parameter = ",sigma)
+rownames(racc) <- c("R","C++")
+knitr::kable(racc)
+```
+
+We see the rates of acceptance are similar, which in turn shows that our codes are right.
+
+```{r}
+Rrw <- cbind(Rrw1[[1]], Rrw2[[1]], Rrw3[[1]], Rrw4[[1]])
+Rrw <- Rrw[10001:N, ]
+Crw <- cbind(Crw1[[1]], Crw2[[1]], Crw3[[1]], Crw4[[1]])
+Crw <- Crw[10001:N, ]
+for(i in 1:4){
+  qqplot(Rrw[,i], Crw[,i], main = paste("QQplot with Sigma = ", sigma[i]), xlab = "Random Walk in R", ylab = "Random Walk in C++")
+}
+```
+
+Given a reasonable scaling parameter (say, 2), the quantiles of the two samples are similar.
+
+```{r}
+time <- microbenchmark(
+  rw.Metropolis(sigma[1], x0, N),
+  rwcpp(sigma[1], x0, N),
+  rw.Metropolis(sigma[2], x0, N),
+  rwcpp(sigma[2], x0, N),
+  rw.Metropolis(sigma[3], x0, N),
+  rwcpp(sigma[3], x0, N),
+  rw.Metropolis(sigma[4], x0, N),
+  rwcpp(sigma[4], x0, N)
+)
+a <- summary(time)[,c(1,3,5,6)]
+knitr::kable(a)
+```
+
+We see that the Rcpp based function is really time efficient (Here sample size = 20000, pretty large).
