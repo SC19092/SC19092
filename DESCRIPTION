@@ -1,0 +1,17 @@
+Package: SC19092
+Type: Package
+Title: Functions written in my life with R
+Version: 1.0
+Date: 2019-12-26
+Author: Zhenghao Zeng
+Maintainer: Zhenghao Zeng <zhzeng1998@outlook.com>
+Description: This package contains useful functions I wrote since I learnt R.
+License: GPL (>= 2)
+Depends: R (>= 3.5.0)
+Imports: Rcpp (>= 1.0.3), glmnet, MFKnockoffs, kedd, knitr, rmarkdown, boot, bootstrap, DAAG, Ball, snowfall, parallel, microbenchmark
+LinkingTo: Rcpp
+Encoding: UTF-8
+RoxygenNote: 7.0.2
+VignetteBuilder: knitr
+URL: http://github.com/SC19092/SC19092
+BugReports: http://github.com/SC19092/SC19092/issues
