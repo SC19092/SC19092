@@ -139,16 +139,16 @@ It is impossible to explain this method but we can see how to use the function. 
 
 \begin{equation}
 \mathbf{y}=\left(\begin{array}{cccc}
-{\mathbf{x}_{\left(1: a_{1}\right)}} & {} & {} & {} \\
+{\mathbf{x}_{\left(1: a_{1}\right)}} & {} & {} &  \\
 {\mathbf{x}_{\left(a_{1}+1: a_{2}\right)}} & {\mathbf{x}_{\left(a_{1}+1: a_{2}\right)}} & {} & {} \\
 {\vdots} & {} & {\ddots} & {} \\
 {\mathbf{x}_{\left(a_{d}+1: n\right)}} & {\mathbf{x}_{\left(a_{d}+1: n\right)}} & {\cdots} & {\mathbf{x}_{\left(a_{d}+1: n\right)}}
 \end{array}\right)\left(\begin{array}{c}
 {\boldsymbol{\beta}_{0}} \\
-{\boldsymbol{\boldsymbol{\zeta}_{1}} \\
+{\boldsymbol{\beta}_{0}} \\
 {\vdots} \\
-{\boldsymbol{\sum_{l=1}^{d} \boldsymbol{\zeta}_{l}}
-\end{array}\right)+\boldsymbol{\epsilon}
+{\boldsymbol{\beta}_{0}}
+\end{array}\right)+\epsilon
 \end{equation}
 
 where $\boldsymbol{\epsilon} \sim \mathcal{N} (0,\sigma^2I_n)$. If we divide the samples to q intervals as follows:
