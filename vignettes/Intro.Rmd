@@ -11,7 +11,7 @@ vignette: >
 
 # Overview
 
-__SC19092__ is my first R package containing three functions implementing three useful methods I learnt during this semester, including examples. To be concrete, the first function is designed for my undergraduate thesis. It considers the problem of change point detection with FDR control. The second function concerns nonparametric test of independence between two random variables. The third function is used to perform efficient sampling from standard laplace distribution based on R package _Rcpp_. The solutions to all homework are also attached here for future purpose.
+__SC19092__ is my first R package containing two functions implementing two useful methods I learnt during this semester, including examples. To be concrete, the first function is designed for my undergraduate thesis. It considers the problem of change point detection with FDR control. The second function concerns nonparametric test of independence between two random variables. The solutions to all homework are also attached here for future purpose.
 
 # Part 1. Introduction to the main functions
 
@@ -1175,7 +1175,7 @@ plot(N,model1.power[1,],main="Power Comparison",type="p",pch=4,col="red",xlab="S
 lines(N,model1.power[1,],col="red")
 points(N,model1.power[2,],type="p",pch=20,col="blue")
 lines(N,model1.power[2,],col="blue")
-legend("topleft",c("Distance","Ball"),pch=c(4,20),col=c("red","blue"),cex=1)
+legend("topleft",c("Distance","Ball"),pch=c(4,20),col=c("red","blue"),cex=0.5)
 
 sfInit(parallel=T,cpus=parallel::detectCores())
 sfLibrary(boot)
@@ -1207,7 +1207,7 @@ plot(N,model2.power[1,],main="Power Comparison",type="p",pch=4,col="red",xlab="S
 lines(N,model2.power[1,],col="red")
 points(N,model2.power[2,],type="p",pch=20,col="blue")
 lines(N,model2.power[2,],col="blue")
-legend("topleft",c("Distance","Ball"),pch=c(4,20),col=c("red","blue"),cex=1)
+legend("bottomright",c("Distance","Ball"),pch=c(4,20),col=c("red","blue"),cex=0.5)
 ```
  
 As we see in the plot, location based method like distance correlation test is more powerful for first model, where the $X-Y$ relation is additive. However, scaling based method like ball covariance test is more likely to detect the scaling  relation between $X$ and $Y$ in the second model and is more powerful.

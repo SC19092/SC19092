@@ -754,7 +754,7 @@ plot(N,model1.power[1,],main="Power Comparison",type="p",pch=4,col="red",xlab="S
 lines(N,model1.power[1,],col="red")
 points(N,model1.power[2,],type="p",pch=20,col="blue")
 lines(N,model1.power[2,],col="blue")
-legend("topleft",c("Distance","Ball"),pch=c(4,20),col=c("red","blue"),cex=1)
+legend("topleft",c("Distance","Ball"),pch=c(4,20),col=c("red","blue"),cex=0.5)
 
 sfInit(parallel=T,cpus=parallel::detectCores())
 sfLibrary(boot)
@@ -786,7 +786,7 @@ plot(N,model2.power[1,],main="Power Comparison",type="p",pch=4,col="red",xlab="S
 lines(N,model2.power[1,],col="red")
 points(N,model2.power[2,],type="p",pch=20,col="blue")
 lines(N,model2.power[2,],col="blue")
-legend("topleft",c("Distance","Ball"),pch=c(4,20),col=c("red","blue"),cex=1)
+legend("bottomright",c("Distance","Ball"),pch=c(4,20),col=c("red","blue"),cex=0.5)
 
 ## -----------------------------------------------------------------------------
 set.seed(521)
