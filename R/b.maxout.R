@@ -1,4 +1,4 @@
-#' Title maxout statistic for resampling
+#' maxout statistic for resampling
 #'
 #' @param z data
 #' @param index resampling index

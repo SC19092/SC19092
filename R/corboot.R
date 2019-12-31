@@ -1,4 +1,4 @@
-#' Title Bootstrap the correlation
+#' Bootstrap the correlation
 #'
 #' @param x data
 #' @param B Number of Bootstrap replications

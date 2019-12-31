@@ -1,4 +1,4 @@
-#' Title Sampling from laplace distribution
+#' Sampling from laplace distribution
 #'
 #' @param sigma scaling parameter for increment
 #' @param x0 initial value

@@ -2,7 +2,7 @@
 % Please edit documentation in R/Wishart.R
 \name{Wishart}
 \alias{Wishart}
-\title{Title Generate N random samples from Wishart distribution (with degrees of freedom n)}
+\title{Generate N random samples from Wishart distribution (with degrees of freedom n)}
 \usage{
 Wishart(N, n, Sigma)
 }
@@ -17,7 +17,7 @@ Wishart(N, n, Sigma)
 N matrix
 }
 \description{
-Title Generate N random samples from Wishart distribution (with degrees of freedom n)
+Generate N random samples from Wishart distribution (with degrees of freedom n)
 }
 \examples{
 \dontrun{

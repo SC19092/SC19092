@@ -1,4 +1,4 @@
-#' Title Compute max out statistic
+#' Compute max out statistic
 #'
 #' @param x first sample
 #' @param y second sample

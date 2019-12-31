@@ -1,4 +1,4 @@
-#' Title log-likelihood of incomplete likelihood
+#' log-likelihood of incomplete likelihood
 #'
 #' @param p parameter p
 #' @param q parameter q

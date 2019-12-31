@@ -1,4 +1,4 @@
-#' Title Calculate Distance Correlation
+#' Calculate Distance Correlation
 #'
 #' @param x first sample
 #' @param y second sample

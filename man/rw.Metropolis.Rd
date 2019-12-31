@@ -2,7 +2,7 @@
 % Please edit documentation in R/rw.Metropolis.R
 \name{rw.Metropolis}
 \alias{rw.Metropolis}
-\title{Title Sampling from laplace distribution}
+\title{Sampling from laplace distribution}
 \usage{
 rw.Metropolis(sigma, x0, N)
 }
@@ -17,7 +17,7 @@ rw.Metropolis(sigma, x0, N)
 a list containing sample and number of rejections
 }
 \description{
-Title Sampling from laplace distribution
+Sampling from laplace distribution
 }
 \examples{
 \dontrun{

@@ -2,7 +2,7 @@
 % Please edit documentation in R/cplm.R
 \name{cplm}
 \alias{cplm}
-\title{Title Change point detection in linear model}
+\title{Change point detection in linear model}
 \usage{
 cplm(X, Y, target, c, changepoint)
 }
@@ -21,7 +21,7 @@ cplm(X, Y, target, c, changepoint)
 a list with FDR reported
 }
 \description{
-Title Change point detection in linear model
+Change point detection in linear model
 }
 \examples{
 \dontrun{

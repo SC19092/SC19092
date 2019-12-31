@@ -2,7 +2,7 @@
 % Please edit documentation in R/KDE_Inde_test.R
 \name{KDE_indep_test}
 \alias{KDE_indep_test}
-\title{Title Independence Test of Random Variables based on KDE}
+\title{Independence Test of Random Variables based on KDE}
 \usage{
 KDE_indep_test(data)
 }
@@ -13,7 +13,7 @@ KDE_indep_test(data)
 test statistic based on KDE and p-value
 }
 \description{
-Title Independence Test of Random Variables based on KDE
+Independence Test of Random Variables based on KDE
 }
 \examples{
 \dontrun{

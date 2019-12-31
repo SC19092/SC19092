@@ -350,11 +350,6 @@ for (i in 1:m){
 mean(coverage)
 
 ## -----------------------------------------------------------------------------
-skew <- function(x){ # A function to calculate skewnwss from samples
-  numerator <- mean((x-mean(x))^3)
-  denominator <- mean((x-mean(x))^2)^(1.5)
-  return(numerator/denominator)
-}
 n <- 1000
 m <- 10000
 skews <- numeric(m)
@@ -371,13 +366,6 @@ aquants # Asymptotic quantiles with normal approximation
 round(se,digits=4) # Estimated variance using large sample results of quantiles
 
 ## -----------------------------------------------------------------------------
-sk <- function(x) {
-#computes the sample skewness coeff.
-xbar <- mean(x)
-m3 <- mean((x - xbar)^3)
-m2 <- mean((x - xbar)^2)
-return( m3 / m2^1.5 )
-} 
 alpha <- 2:6
 n <- 1000 # Sample size
 m <- 1000 # No. of replications
@@ -386,8 +374,8 @@ colnames(results) <- paste("alpha=",alpha)
 for(k in 1:length(alpha)){
   for(i in 1:m){
     x <- rbeta(n,alpha[k],alpha[k])
-    skew <- sk(x)
-    test <- abs(sqrt(n/6)*skew)
+    skew0 <- skew(x)
+    test <- abs(sqrt(n/6)*skew0)
     results[i,k] <- test>qnorm(0.975)
   }
 }
@@ -399,8 +387,8 @@ results <- matrix(0,nrow=m,ncol=length(nu))
 for(k in 1:length(nu)){
   for(i in 1:m){
     x <- rt(n,nu[k])
-    skew <- sk(x)
-    test <- abs(sqrt(n/6)*skew)
+    skew0 <- skew(x)
+    test <- abs(sqrt(n/6)*skew0)
     results[i,k] <- test>qnorm(0.975)
   }
 }
@@ -467,14 +455,7 @@ colnames(ses) <- c("mec, vec","alg, ana","alg, sta","ana, sta")
 knitr::kable(ses)
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  sk <- function(x) {
-#  #computes the sample skewness coeff.
-#  xbar <- mean(x)
-#  m3 <- mean((x - xbar)^3)
-#  m2 <- mean((x - xbar)^2)
-#  return( m3 / m2^1.5 )
-#  }
-#  b.sk <- function(x,i) return(sk(x[i]))
+#  b.sk <- function(x,i) return(skew(x[i]))
 #  m <- 100 # Number of replications
 #  n <- c(10,20,50,100,500,1000) # Sample size
 #  N <- length(n)

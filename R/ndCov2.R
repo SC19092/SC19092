@@ -1,4 +1,4 @@
-#' Title Distance Correlation for Bootstrap
+#' Distance Correlation for Bootstrap
 #'
 #' @param z all sample
 #' @param ix index for Bootstrap

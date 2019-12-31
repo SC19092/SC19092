@@ -2,7 +2,7 @@
 % Please edit documentation in R/mix_gauss.R
 \name{mix_gauss}
 \alias{mix_gauss}
-\title{Title Generate the random numbers from the mixture distribution}
+\title{Generate the random numbers from the mixture distribution}
 \usage{
 mix_gauss(n, p1)
 }
@@ -15,7 +15,7 @@ mix_gauss(n, p1)
 Sample following mixture gaussian
 }
 \description{
-Title Generate the random numbers from the mixture distribution
+Generate the random numbers from the mixture distribution
 }
 \examples{
 \dontrun{

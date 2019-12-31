@@ -1,4 +1,4 @@
-#' Title Monte Carlo integration with antithetic variables
+#' Monte Carlo integration with antithetic variables
 #'
 #' @param n sample size
 #' @param anti whether to use antithetic variables

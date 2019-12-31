@@ -2,7 +2,7 @@
 % Please edit documentation in R/EMABO.R
 \name{EMABO}
 \alias{EMABO}
-\title{Title EM algorithm for Bolld type}
+\title{EM algorithm for blood type}
 \usage{
 EMABO(N, nA, nB, nO, nAB, n)
 }
@@ -23,7 +23,7 @@ EMABO(N, nA, nB, nO, nAB, n)
 the MLE of p, q
 }
 \description{
-Title EM algorithm for Bolld type
+EM algorithm for blood type
 }
 \examples{
 \dontrun{

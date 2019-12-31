@@ -1,4 +1,4 @@
-#' Title Generate N random samples from Wishart distribution (with degrees of freedom n)
+#' Generate N random samples from Wishart distribution (with degrees of freedom n)
 #' @import stats 
 #' @param N sample size
 #' @param n degree of freedom

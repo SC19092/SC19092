@@ -1,4 +1,4 @@
-#' Title EM algorithm for Bolld type
+#' EM algorithm for blood type
 #'
 #' @param N the number of random initial values
 #' @param nA number of cases A

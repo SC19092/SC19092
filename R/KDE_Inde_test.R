@@ -1,4 +1,4 @@
-#' Title Independence Test of Random Variables based on KDE
+#' Independence Test of Random Variables based on KDE
 #'
 #' @import kedd
 #' @importFrom stats dnorm pnorm

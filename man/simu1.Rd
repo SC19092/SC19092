@@ -2,7 +2,7 @@
 % Please edit documentation in R/simu1.R
 \name{simu1}
 \alias{simu1}
-\title{Title Monte Carlo integration with antithetic variables}
+\title{Monte Carlo integration with antithetic variables}
 \usage{
 simu1(n, anti = T)
 }
@@ -15,7 +15,7 @@ simu1(n, anti = T)
 estimated integral
 }
 \description{
-Title Monte Carlo integration with antithetic variables
+Monte Carlo integration with antithetic variables
 }
 \examples{
 \dontrun{

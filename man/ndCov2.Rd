@@ -2,7 +2,7 @@
 % Please edit documentation in R/ndCov2.R
 \name{ndCov2}
 \alias{ndCov2}
-\title{Title Distance Correlation for Bootstrap}
+\title{Distance Correlation for Bootstrap}
 \usage{
 ndCov2(z, ix, dims)
 }
@@ -17,7 +17,7 @@ ndCov2(z, ix, dims)
 test statistic
 }
 \description{
-Title Distance Correlation for Bootstrap
+Distance Correlation for Bootstrap
 }
 \examples{
 \dontrun{

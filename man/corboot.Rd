@@ -2,7 +2,7 @@
 % Please edit documentation in R/corboot.R
 \name{corboot}
 \alias{corboot}
-\title{Title Bootstrap the correlation}
+\title{Bootstrap the correlation}
 \usage{
 corboot(x, B)
 }
@@ -15,7 +15,7 @@ corboot(x, B)
 estimated standard deviation
 }
 \description{
-Title Bootstrap the correlation
+Bootstrap the correlation
 }
 \examples{
 \dontrun{

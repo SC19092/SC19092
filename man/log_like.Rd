@@ -2,7 +2,7 @@
 % Please edit documentation in R/log_like.R
 \name{log_like}
 \alias{log_like}
-\title{Title log-likelihood of incomplete likelihood}
+\title{log-likelihood of incomplete likelihood}
 \usage{
 log_like(p, q, r, nA, nB, nO, nAB)
 }
@@ -25,7 +25,7 @@ log_like(p, q, r, nA, nB, nO, nAB)
 log-likelihood
 }
 \description{
-Title log-likelihood of incomplete likelihood
+log-likelihood of incomplete likelihood
 }
 \examples{
 \dontrun{

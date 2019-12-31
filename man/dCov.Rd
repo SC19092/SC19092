@@ -2,7 +2,7 @@
 % Please edit documentation in R/dCov.R
 \name{dCov}
 \alias{dCov}
-\title{Title Calculate Distance Correlation}
+\title{Calculate Distance Correlation}
 \usage{
 dCov(x, y)
 }
@@ -15,7 +15,7 @@ dCov(x, y)
 Distance Correlation
 }
 \description{
-Title Calculate Distance Correlation
+Calculate Distance Correlation
 }
 \examples{
 \dontrun{

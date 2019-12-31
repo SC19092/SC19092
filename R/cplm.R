@@ -1,4 +1,4 @@
-#' Title Change point detection in linear model
+#' Change point detection in linear model
 #' @import glmnet
 #' @import MFKnockoffs
 #' @importFrom stats predict

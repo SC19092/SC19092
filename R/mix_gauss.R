@@ -1,4 +1,4 @@
-#' Title Generate the random numbers from the mixture distribution
+#' Generate the random numbers from the mixture distribution
 #'
 #' @param n The sample size
 #' @param p1 Proportion

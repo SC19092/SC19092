@@ -2,7 +2,7 @@
 % Please edit documentation in R/b.maxout.R
 \name{b.maxout}
 \alias{b.maxout}
-\title{Title maxout statistic for resampling}
+\title{maxout statistic for resampling}
 \usage{
 b.maxout(z, index, dims)
 }
@@ -17,7 +17,7 @@ b.maxout(z, index, dims)
 maxout statistic
 }
 \description{
-Title maxout statistic for resampling
+maxout statistic for resampling
 }
 \examples{
 \dontrun{

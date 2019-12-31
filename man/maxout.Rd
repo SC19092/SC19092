@@ -2,7 +2,7 @@
 % Please edit documentation in R/maxout.R
 \name{maxout}
 \alias{maxout}
-\title{Title Compute max out statistic}
+\title{Compute max out statistic}
 \usage{
 maxout(x, y)
 }
@@ -15,7 +15,7 @@ maxout(x, y)
 max out statistic
 }
 \description{
-Title Compute max out statistic
+Compute max out statistic
 }
 \examples{
 \dontrun{
