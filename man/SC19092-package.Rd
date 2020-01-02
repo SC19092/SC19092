@@ -1,6 +1,5 @@
 \name{SC19092-package}
 \alias{SC19092-package}
-\alias{SC19092}
 \docType{package}
 \title{
   Final Project of Course "Statistical Computing"

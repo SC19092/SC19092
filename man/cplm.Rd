@@ -7,13 +7,13 @@
 cplm(X, Y, target, c, changepoint)
 }
 \arguments{
-\item{X}{the data matrix}
+\item{X}{the design matrix}
 
 \item{Y}{the response vector}
 
 \item{target}{the target FDR level}
 
-\item{c}{tuning parameter on the interval's length}
+\item{c}{tuning parameter on the interval's length, typically set to 1 or 2}
 
 \item{changepoint}{oracle location of changepoints for reference}
 }
@@ -21,7 +21,7 @@ cplm(X, Y, target, c, changepoint)
 a list with FDR reported
 }
 \description{
-Change point detection in linear model
+This method converts the problem into a variable selection problem and apply the idea of knockoff filter so that it can detect change points with both high power and guaranteed FDR control. The argument X is the design matrix and Y is the response vector. The argument target sets the desired FDR one wants to obtain. The argument c is the tuning parameter determining the length of intervals and is typically set to 1 or 2 from a Bayesian perspective. The argument changepoint is the oracle location of the change points. Since this function is used for simulation purpose, the oracle location is provided as contrast. It returns the FDR, modified FDR and power of two knockoff thresholds.
 }
 \examples{
 \dontrun{

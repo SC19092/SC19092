@@ -454,112 +454,112 @@ ses <- rbind(ses1,ses2)
 colnames(ses) <- c("mec, vec","alg, ana","alg, sta","ana, sta")
 knitr::kable(ses)
 
-## ----eval=FALSE---------------------------------------------------------------
-#  b.sk <- function(x,i) return(skew(x[i]))
-#  m <- 100 # Number of replications
-#  n <- c(10,20,50,100,500,1000) # Sample size
-#  N <- length(n)
-#  results.norm <- matrix(0,nrow=N,ncol=3)
-#  results.basic <- matrix(0,nrow=N,ncol=3)
-#  results.perc <- matrix(0,nrow=N,ncol=3)
-#  results.bca <- matrix(0,nrow=N,ncol=3)
-#  for(i in 1:N){
-#    result.norm <- matrix(0,nrow=m,ncol=3)
-#    result.basic <- matrix(0,nrow=m,ncol=3)
-#    result.perc <- matrix(0,nrow=m,ncol=3)
-#    result.bca <- matrix(0,nrow=m,ncol=3)
-#    for(k in 1:m){
-#      x <- rnorm(n[i])
-#      boo <- boot(data=x,statistic=b.sk,R=1000)
-#      CI <- boot.ci(boo,type=c("norm","basic","perc","bca"))
-#      CI.norm <- CI$normal[2:3]
-#      CI.basic <- CI$basic[4:5]
-#      CI.perc <- CI$percent[4:5]
-#      CI.bca <- CI$bca[4:5]
-#      result.norm[k,1] <- I(CI.norm[1]>0)
-#      result.norm[k,2] <- I(CI.norm[1]<=0)*I(CI.norm[2]>=0)
-#      result.norm[k,3] <- I(CI.norm[2]<0)
-#      result.basic[k,1] <- I(CI.basic[1]>0)
-#      result.basic[k,2] <- I(CI.basic[1]<=0)*I(CI.basic[2]>=0)
-#      result.basic[k,3] <- I(CI.basic[2]<0)
-#      result.perc[k,1] <- I(CI.perc[1]>0)
-#      result.perc[k,2] <- I(CI.perc[1]<=0)*I(CI.perc[2]>=0)
-#      result.perc[k,3] <- I(CI.perc[2]<0)
-#      result.bca[k,1] <- I(CI.bca[1]>0)
-#      result.bca[k,2] <- I(CI.bca[1]<=0)*I(CI.bca[2]>=0)
-#      result.bca[k,3] <- I(CI.bca[2]<0)
-#    }
-#    results.norm[i,] <- apply(result.norm,2,mean)
-#    results.basic[i,] <- apply(result.basic,2,mean)
-#    results.perc[i,] <- apply(result.perc,2,mean)
-#    results.bca[i,] <- apply(result.bca,2,mean)
-#  }
-#  colnames(results.norm) <- c("Missing on the left","Covered","Missing on the right")
-#  colnames(results.basic) <- c("Missing on the left","Covered","Missing on the right")
-#  colnames(results.perc) <- c("Missing on the left","Covered","Missing on the right")
-#  colnames(results.bca) <- c("Missing on the left","Covered","Missing on the right")
-#  rownames(results.norm) <- paste("n=",c(10,20,50,100,500,1000))
-#  rownames(results.basic) <- paste("n=",c(10,20,50,100,500,1000))
-#  rownames(results.perc) <- paste("n=",c(10,20,50,100,500,1000))
-#  rownames(results.bca) <- paste("n=",c(10,20,50,100,500,1000))
+## -----------------------------------------------------------------------------
+b.sk <- function(x,i) return(skew(x[i]))
+m <- 100 # Number of replications
+n <- c(10,20,50,100,500,1000) # Sample size
+N <- length(n)
+results.norm <- matrix(0,nrow=N,ncol=3)
+results.basic <- matrix(0,nrow=N,ncol=3)
+results.perc <- matrix(0,nrow=N,ncol=3)
+results.bca <- matrix(0,nrow=N,ncol=3)
+for(i in 1:N){
+  result.norm <- matrix(0,nrow=m,ncol=3)
+  result.basic <- matrix(0,nrow=m,ncol=3)
+  result.perc <- matrix(0,nrow=m,ncol=3)
+  result.bca <- matrix(0,nrow=m,ncol=3)
+  for(k in 1:m){
+    x <- rnorm(n[i])
+    boo <- boot(data=x,statistic=b.sk,R=1000)
+    CI <- boot.ci(boo,type=c("norm","basic","perc","bca"))
+    CI.norm <- CI$normal[2:3]
+    CI.basic <- CI$basic[4:5]
+    CI.perc <- CI$percent[4:5]
+    CI.bca <- CI$bca[4:5]
+    result.norm[k,1] <- I(CI.norm[1]>0)
+    result.norm[k,2] <- I(CI.norm[1]<=0)*I(CI.norm[2]>=0)
+    result.norm[k,3] <- I(CI.norm[2]<0)
+    result.basic[k,1] <- I(CI.basic[1]>0)
+    result.basic[k,2] <- I(CI.basic[1]<=0)*I(CI.basic[2]>=0)
+    result.basic[k,3] <- I(CI.basic[2]<0)
+    result.perc[k,1] <- I(CI.perc[1]>0)
+    result.perc[k,2] <- I(CI.perc[1]<=0)*I(CI.perc[2]>=0)
+    result.perc[k,3] <- I(CI.perc[2]<0)
+    result.bca[k,1] <- I(CI.bca[1]>0)
+    result.bca[k,2] <- I(CI.bca[1]<=0)*I(CI.bca[2]>=0)
+    result.bca[k,3] <- I(CI.bca[2]<0)
+  }
+  results.norm[i,] <- apply(result.norm,2,mean)
+  results.basic[i,] <- apply(result.basic,2,mean)
+  results.perc[i,] <- apply(result.perc,2,mean)
+  results.bca[i,] <- apply(result.bca,2,mean)
+}
+colnames(results.norm) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.basic) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.perc) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.bca) <- c("Missing on the left","Covered","Missing on the right")
+rownames(results.norm) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.basic) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.perc) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.bca) <- paste("n=",c(10,20,50,100,500,1000))
 
-## ---- eval=FALSE--------------------------------------------------------------
-#  knitr::kable(results.norm) # Normal interval
-#  knitr::kable(results.basic) # Basic interval
-#  knitr::kable(results.perc) # Percentile interval
-#  knitr::kable(results.bca) # BCA interval
+## -----------------------------------------------------------------------------
+knitr::kable(results.norm) # Normal interval
+knitr::kable(results.basic) # Basic interval
+knitr::kable(results.perc) # Percentile interval
+knitr::kable(results.bca) # BCA interval
 
-## ---- eval=FALSE--------------------------------------------------------------
-#  true_sk <- sqrt(8/5)
-#  results.norm <- matrix(0,nrow=N,ncol=3)
-#  results.basic <- matrix(0,nrow=N,ncol=3)
-#  results.perc <- matrix(0,nrow=N,ncol=3)
-#  results.bca <- matrix(0,nrow=N,ncol=3)
-#  for(i in 1:N){
-#    result.norm <- matrix(0,nrow=m,ncol=3)
-#    result.basic <- matrix(0,nrow=m,ncol=3)
-#    result.perc <- matrix(0,nrow=m,ncol=3)
-#    result.bca <- matrix(0,nrow=m,ncol=3)
-#    for(k in 1:m){
-#      x <- rchisq(n[i],df=5)
-#      boo <- boot(data=x,statistic=b.sk,R=1000)
-#      CI <- boot.ci(boo,type=c("norm","basic","perc","bca"))
-#      CI.norm <- CI$normal[2:3]
-#      CI.basic <- CI$basic[4:5]
-#      CI.perc <- CI$percent[4:5]
-#      CI.bca <- CI$bca[4:5]
-#      result.norm[k,1] <- I(CI.norm[1]>true_sk)
-#      result.norm[k,2] <- I(CI.norm[1]<=true_sk)*I(CI.norm[2]>=true_sk)
-#      result.norm[k,3] <- I(CI.norm[2]<true_sk)
-#      result.basic[k,1] <- I(CI.basic[1]>true_sk)
-#      result.basic[k,2] <- I(CI.basic[1]<=true_sk)*I(CI.basic[2]>=true_sk)
-#      result.basic[k,3] <- I(CI.basic[2]<true_sk)
-#      result.perc[k,1] <- I(CI.perc[1]>true_sk)
-#      result.perc[k,2] <- I(CI.perc[1]<=true_sk)*I(CI.perc[2]>=true_sk)
-#      result.perc[k,3] <- I(CI.perc[2]<true_sk)
-#      result.bca[k,1] <- I(CI.bca[1]>true_sk)
-#      result.bca[k,2] <- I(CI.bca[1]<=true_sk)*I(CI.bca[2]>=true_sk)
-#      result.bca[k,3] <- I(CI.bca[2]<true_sk)
-#    }
-#    results.norm[i,] <- apply(result.norm,2,mean)
-#    results.basic[i,] <- apply(result.basic,2,mean)
-#    results.perc[i,] <- apply(result.perc,2,mean)
-#    results.bca[i,] <- apply(result.bca,2,mean)
-#  }
-#  colnames(results.norm) <- c("Missing on the left","Covered","Missing on the right")
-#  colnames(results.basic) <- c("Missing on the left","Covered","Missing on the right")
-#  colnames(results.perc) <- c("Missing on the left","Covered","Missing on the right")
-#  colnames(results.bca) <- c("Missing on the left","Covered","Missing on the right")
-#  rownames(results.norm) <- paste("n=",c(10,20,50,100,500,1000))
-#  rownames(results.basic) <- paste("n=",c(10,20,50,100,500,1000))
-#  rownames(results.perc) <- paste("n=",c(10,20,50,100,500,1000))
-#  rownames(results.bca) <- paste("n=",c(10,20,50,100,500,1000))
+## -----------------------------------------------------------------------------
+true_sk <- sqrt(8/5)
+results.norm <- matrix(0,nrow=N,ncol=3)
+results.basic <- matrix(0,nrow=N,ncol=3)
+results.perc <- matrix(0,nrow=N,ncol=3)
+results.bca <- matrix(0,nrow=N,ncol=3)
+for(i in 1:N){
+  result.norm <- matrix(0,nrow=m,ncol=3)
+  result.basic <- matrix(0,nrow=m,ncol=3)
+  result.perc <- matrix(0,nrow=m,ncol=3)
+  result.bca <- matrix(0,nrow=m,ncol=3)
+  for(k in 1:m){
+    x <- rchisq(n[i],df=5)
+    boo <- boot(data=x,statistic=b.sk,R=1000)
+    CI <- boot.ci(boo,type=c("norm","basic","perc","bca"))
+    CI.norm <- CI$normal[2:3]
+    CI.basic <- CI$basic[4:5]
+    CI.perc <- CI$percent[4:5]
+    CI.bca <- CI$bca[4:5]
+    result.norm[k,1] <- I(CI.norm[1]>true_sk)
+    result.norm[k,2] <- I(CI.norm[1]<=true_sk)*I(CI.norm[2]>=true_sk)
+    result.norm[k,3] <- I(CI.norm[2]<true_sk)
+    result.basic[k,1] <- I(CI.basic[1]>true_sk)
+    result.basic[k,2] <- I(CI.basic[1]<=true_sk)*I(CI.basic[2]>=true_sk)
+    result.basic[k,3] <- I(CI.basic[2]<true_sk)
+    result.perc[k,1] <- I(CI.perc[1]>true_sk)
+    result.perc[k,2] <- I(CI.perc[1]<=true_sk)*I(CI.perc[2]>=true_sk)
+    result.perc[k,3] <- I(CI.perc[2]<true_sk)
+    result.bca[k,1] <- I(CI.bca[1]>true_sk)
+    result.bca[k,2] <- I(CI.bca[1]<=true_sk)*I(CI.bca[2]>=true_sk)
+    result.bca[k,3] <- I(CI.bca[2]<true_sk)
+  }
+  results.norm[i,] <- apply(result.norm,2,mean)
+  results.basic[i,] <- apply(result.basic,2,mean)
+  results.perc[i,] <- apply(result.perc,2,mean)
+  results.bca[i,] <- apply(result.bca,2,mean)
+}
+colnames(results.norm) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.basic) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.perc) <- c("Missing on the left","Covered","Missing on the right")
+colnames(results.bca) <- c("Missing on the left","Covered","Missing on the right")
+rownames(results.norm) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.basic) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.perc) <- paste("n=",c(10,20,50,100,500,1000))
+rownames(results.bca) <- paste("n=",c(10,20,50,100,500,1000))
 
-## ---- eval=FALSE--------------------------------------------------------------
-#  knitr::kable(results.norm) # Normal interval
-#  knitr::kable(results.basic) # Basic interval
-#  knitr::kable(results.perc) # Percentile interval
-#  knitr::kable(results.bca) # BCA interval
+## -----------------------------------------------------------------------------
+knitr::kable(results.norm) # Normal interval
+knitr::kable(results.basic) # Basic interval
+knitr::kable(results.perc) # Percentile interval
+knitr::kable(results.bca) # BCA interval
 
 ## -----------------------------------------------------------------------------
 library(bootstrap)

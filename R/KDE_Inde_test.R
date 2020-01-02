@@ -1,8 +1,8 @@
-#' Independence Test of Random Variables based on KDE
-#'
+#' @title Independence Test of Random Variables based on KDE
+#' @description Apply KDE method to test the independence. The main idea of this test is to estimate the joint density and marginal density, respectively. And then test if the joint density is the product of two marginal density. The asymptotic distribution of the test statistic is used to compute p-value. The argument data is a matrix or dataframe with two columns. Then the independence of the two columns is tested. It returns the test statistic and p-value.
 #' @import kedd
 #' @importFrom stats dnorm pnorm
-#' @param data A two dimension data matrix 
+#' @param data A two dimension data matrix whose two columns are of interest
 #'
 #' @return test statistic based on KDE and p-value
 #' @export

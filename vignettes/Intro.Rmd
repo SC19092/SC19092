@@ -19,6 +19,40 @@ __SC19092__ is my first R package containing two functions implementing two usef
 
 The first function _cplm_ is designed for change point detection in linear model, that is, the point when the regression coefficients start to change. This method converts the problem into a variable selection problem and apply the idea of knockoff filter so that it can detect change points with both high power and guaranteed FDR control. The argument X is the design matrix and Y is the response vector. The argument target sets the desired FDR one wants to obtain. The argument c is the tuning parameter determining the length of intervals and is typically set to 1 or 2 from a Bayesian perspective. The argument changepoint is the oracle location of the change points. Since this function is used for simulation purpose, the oracle location is provided as contrast. It returns the FDR, modified FDR and power of two knockoff thresholds.
 
+Consider a linear model with s changepoints located at $a_1, \dots, a_s$
+
+\begin{equation}
+\mathbf{y}=\left(\begin{array}{cccc}
+{\mathbf{x}_{\left(1: a_{1}\right)}} & {} & {} &  \\
+{\mathbf{x}_{\left(a_{1}+1: a_{2}\right)}} & {\mathbf{x}_{\left(a_{1}+1: a_{2}\right)}} & {} & {} \\
+{\vdots} & {} & {\ddots} & {} \\
+{\mathbf{x}_{\left(a_{d}+1: n\right)}} & {\mathbf{x}_{\left(a_{d}+1: n\right)}} & {\cdots} & {\mathbf{x}_{\left(a_{d}+1: n\right)}}
+\end{array}\right)\left(\begin{array}{c}
+{\boldsymbol{\beta}_{0}} \\
+{\boldsymbol{\zeta}_{1}} \\
+{\vdots} \\
+{\boldsymbol{\zeta}_{d}}
+\end{array}\right)+\epsilon
+\end{equation}
+
+where $\boldsymbol{\epsilon} \sim \mathcal{N} (0,\sigma^2I_n)$. If we divide the samples to q intervals as follows:
+
+\begin{equation}
+\mathbf{y}=\left(\begin{array}{cccc}
+{\mathbf{x}_{(1)}} & {} & {} & {} \\
+{\mathbf{x}_{(2)}} & {\mathbf{x}_{(2)}} & {} & {} \\
+{\vdots} & {\vdots} & {\ddots} & {} \\
+{\mathbf{x}_{\left(q_{n}\right)}} & {\mathbf{x}_{\left(q_{n}\right)}} & {\cdots} & {\mathbf{x}_{\left(q_{n}\right)}}
+\end{array}\right)\left(\begin{array}{c}
+{\boldsymbol{\theta}_{(1)}^{0}} \\
+{\boldsymbol{\theta}_{(2)}^{0}} \\
+{\vdots} \\
+{\boldsymbol{\theta}_{\left(q_{n}\right)}^{0}}
+\end{array}\right)+\mathbf{X}_{\omega} \boldsymbol{\omega}+\epsilon
+\end{equation}
+
+and want to detect those intervals containing a changepoint. It is equivalent to select intervals with $\boldsymbol{\theta}_{(i)}^{0} \neq 0$. So the variable selection techniques can be applied to select intervals with FDR control.
+
 The source R code for function _cplm_ is as follows:
 
 ```{r,eval=FALSE}
@@ -135,39 +169,7 @@ function(X, Y, target, c, changepoint){
 }
 ```
 
-It is impossible to explain this method but we can see how to use the function. Consider a linear model with s changepoints located at $a_1, \dots, a_s$
-
-\begin{equation}
-\mathbf{y}=\left(\begin{array}{cccc}
-{\mathbf{x}_{\left(1: a_{1}\right)}} & {} & {} &  \\
-{\mathbf{x}_{\left(a_{1}+1: a_{2}\right)}} & {\mathbf{x}_{\left(a_{1}+1: a_{2}\right)}} & {} & {} \\
-{\vdots} & {} & {\ddots} & {} \\
-{\mathbf{x}_{\left(a_{d}+1: n\right)}} & {\mathbf{x}_{\left(a_{d}+1: n\right)}} & {\cdots} & {\mathbf{x}_{\left(a_{d}+1: n\right)}}
-\end{array}\right)\left(\begin{array}{c}
-{\boldsymbol{\beta}_{0}} \\
-{\boldsymbol{\zeta}_{1}} \\
-{\vdots} \\
-{\boldsymbol{\zeta}_{d}}
-\end{array}\right)+\epsilon
-\end{equation}
-
-where $\boldsymbol{\epsilon} \sim \mathcal{N} (0,\sigma^2I_n)$. If we divide the samples to q intervals as follows:
-
-\begin{equation}
-\mathbf{y}=\left(\begin{array}{cccc}
-{\mathbf{x}_{(1)}} & {} & {} & {} \\
-{\mathbf{x}_{(2)}} & {\mathbf{x}_{(2)}} & {} & {} \\
-{\vdots} & {\vdots} & {\ddots} & {} \\
-{\mathbf{x}_{\left(q_{n}\right)}} & {\mathbf{x}_{\left(q_{n}\right)}} & {\cdots} & {\mathbf{x}_{\left(q_{n}\right)}}
-\end{array}\right)\left(\begin{array}{c}
-{\boldsymbol{\theta}_{(1)}^{0}} \\
-{\boldsymbol{\theta}_{(2)}^{0}} \\
-{\vdots} \\
-{\boldsymbol{\theta}_{\left(q_{n}\right)}^{0}}
-\end{array}\right)+\mathbf{X}_{\omega} \boldsymbol{\omega}+\epsilon
-\end{equation}
-
-and want to detect those intervals containing a changepoint. It is equivalent to select intervals with $\boldsymbol{\theta}_{(i)}^{0} \neq 0$. So the variable selection techniques can be applied to select intervals with FDR control. Here is an example containing 4 changepoints.
+Here is an example containing 4 changepoints. Let $(a_1, a_2,a_3,a_4) = (200,400,600,800)$. 
 
 ```{r}
 library(SC19092)
@@ -312,7 +314,7 @@ KDE_indep_test(faithful)
 plot(faithful)
 ```
 
-So we see the test reject the null hypothesis.
+So we see the test reject the null hypothesis. And clearly there are two clusters in the scattor plot, so it is unlikely that the two variables are independent.
 
 # Part 2. Solutions to homework
 
@@ -797,7 +799,7 @@ porportion of times that the confidence intervals miss on the right.
 rates for normal populations (skewness 0) and $\chi^2(5)$ distributions (positive
 skewness).
 
-```{r,eval=FALSE}
+```{r}
 b.sk <- function(x,i) return(skew(x[i]))
 m <- 100 # Number of replications
 n <- c(10,20,50,100,500,1000) # Sample size
@@ -849,7 +851,7 @@ rownames(results.bca) <- paste("n=",c(10,20,50,100,500,1000))
 
 Then we display the results for normal distribution.
 
-```{r, eval=FALSE}
+```{r}
 knitr::kable(results.norm) # Normal interval
 knitr::kable(results.basic) # Basic interval
 knitr::kable(results.perc) # Percentile interval
@@ -858,7 +860,7 @@ knitr::kable(results.bca) # BCA interval
 
 Then we repeat analysis for $\chi^2(5)$.
 
-```{r, eval=FALSE}
+```{r}
 true_sk <- sqrt(8/5)
 results.norm <- matrix(0,nrow=N,ncol=3)
 results.basic <- matrix(0,nrow=N,ncol=3)
@@ -907,7 +909,7 @@ rownames(results.bca) <- paste("n=",c(10,20,50,100,500,1000))
 
 Then we display the results for $\chi^2(5)$.
 
-```{r, eval=FALSE}
+```{r}
 knitr::kable(results.norm) # Normal interval
 knitr::kable(results.basic) # Basic interval
 knitr::kable(results.perc) # Percentile interval
